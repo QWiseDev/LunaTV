@@ -344,14 +344,14 @@ function SourcesPageClient() {
 
   return (
     <PageLayout activePath={getActivePath()}>
-      <div className='px-4 sm:px-10 py-4 sm:py-8'>
+      <div className='px-4 sm:px-10 py-3 sm:py-6'>
         {/* 搜索框 */}
         {selectedSource && (
-          <div className='mb-6 flex justify-center'>
+          <div className='mb-4 flex justify-center'>
             <div className='relative max-w-md w-full group'>
-              <div className='relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl border-2 border-gray-200/60 dark:border-gray-600/60 shadow-lg hover:shadow-xl dark:shadow-gray-900/30 transition-all duration-300 group-hover:border-blue-300/60 group-focus-within:border-blue-400/60'>
-                <div className='absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none'>
-                  <Search className='h-5 w-5 text-gray-400 dark:text-gray-300 group-focus-within:text-blue-400 transition-all duration-300' />
+              <div className='relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-xl border border-gray-200/60 dark:border-gray-600/60 shadow-sm hover:shadow-md transition-all duration-200 group-hover:border-blue-300/60 group-focus-within:border-blue-400/60'>
+                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                  <Search className='h-4 w-4 text-gray-400 dark:text-gray-300 group-focus-within:text-blue-400 transition-all duration-200' />
                 </div>
                 <input
                   type='text'
@@ -363,20 +363,20 @@ function SourcesPageClient() {
                     }
                   }}
                   placeholder={`在 ${selectedSourceName} 中搜索...`}
-                  className='block w-full pl-12 pr-24 py-3 text-sm bg-transparent border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400'
+                  className='block w-full pl-10 pr-20 py-2.5 text-sm bg-transparent border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400'
                 />
                 <div className='absolute inset-y-0 right-0 flex items-center'>
                   {searchQuery && (
                     <button
                       onClick={clearSearch}
-                      className='px-2 py-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors'
+                      className='px-1.5 py-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors'
                     >
                       清空
                     </button>
                   )}
                   <button
                     onClick={() => handleSearch(searchQuery)}
-                    className='mr-1 px-3 py-1.5 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                    className='mr-1 px-2.5 py-1 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-all duration-200 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed'
                     disabled={isSearching}
                   >
                     {isSearching ? '搜索中...' : '搜索'}
@@ -389,24 +389,24 @@ function SourcesPageClient() {
 
         {/* 视频源选择 */}
         {!sourcesLoading && sources.length > 0 && (
-          <div className='mb-6'>
-            <div className='bg-white/70 dark:bg-gray-800/70 rounded-2xl p-4 border-2 border-gray-200/50 dark:border-gray-600/50 backdrop-blur-lg shadow-lg'>
-              <div className='flex flex-col sm:flex-row sm:items-center gap-3'>
-                <span className='text-sm font-semibold text-gray-700 dark:text-gray-200 min-w-[60px] flex-shrink-0'>
-                  🎬 视频源
+          <div className='mb-4'>
+            <div className='bg-white/70 dark:bg-gray-800/70 rounded-xl p-3 border border-gray-200/50 dark:border-gray-600/50 backdrop-blur-lg shadow-sm'>
+              <div className='flex flex-col sm:flex-row sm:items-center gap-2'>
+                <span className='text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[50px] flex-shrink-0 flex items-center gap-1'>
+                  🎬 <span className='hidden sm:inline'>视频源</span>
                 </span>
                 <div className='w-full'>
-                  <div className='flex flex-wrap gap-2 bg-gray-100/80 dark:bg-gray-700/80 rounded-2xl p-2'>
+                  <div className='flex flex-wrap gap-1.5 bg-gray-100/60 dark:bg-gray-700/60 rounded-lg p-1.5'>
                     {sources.map((source) => {
                       const isActive = selectedSource === source.key;
                       return (
                         <button
                           key={source.key}
                           onClick={() => handleSourceChange(source.key)}
-                          className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-300 whitespace-nowrap ${
+                          className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap ${
                             isActive
-                              ? 'bg-white dark:bg-gray-500 text-blue-700 dark:text-blue-300 shadow-lg'
-                              : 'text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 hover:bg-white/50 dark:hover:bg-gray-600/50'
+                              ? 'bg-white dark:bg-gray-500 text-blue-700 dark:text-blue-300 shadow-sm scale-[1.02]'
+                              : 'text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 hover:bg-white/60 dark:hover:bg-gray-600/60'
                           }`}
                         >
                           {source.name}
@@ -422,20 +422,20 @@ function SourcesPageClient() {
 
         {/* 分类选择 */}
         {selectedSource && !categoriesLoading && categories.length > 0 && (
-          <div className='mb-6'>
-            <div className='bg-white/70 dark:bg-gray-800/70 rounded-2xl p-4 border-2 border-gray-200/50 dark:border-gray-600/50 backdrop-blur-lg shadow-lg'>
-              <div className='flex flex-col sm:flex-row sm:items-center gap-3'>
-                <span className='text-sm font-semibold text-gray-700 dark:text-gray-200 min-w-[60px] flex-shrink-0'>
-                  🏷️ 分类
+          <div className='mb-4'>
+            <div className='bg-white/70 dark:bg-gray-800/70 rounded-xl p-3 border border-gray-200/50 dark:border-gray-600/50 backdrop-blur-lg shadow-sm'>
+              <div className='flex flex-col sm:flex-row sm:items-center gap-2'>
+                <span className='text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[50px] flex-shrink-0 flex items-center gap-1'>
+                  🏷️ <span className='hidden sm:inline'>分类</span>
                 </span>
                 <div className='w-full'>
-                  <div className='flex flex-wrap gap-2 bg-gray-100/80 dark:bg-gray-700/80 rounded-2xl p-2'>
+                  <div className='flex flex-wrap gap-1.5 bg-gray-100/60 dark:bg-gray-700/60 rounded-lg p-1.5'>
                     <button
                       onClick={() => handleCategoryChange('all')}
-                      className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-300 whitespace-nowrap ${
+                      className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap ${
                         !selectedCategory || selectedCategory === 'all'
-                          ? 'bg-white dark:bg-gray-500 text-purple-700 dark:text-purple-300 shadow-lg'
-                          : 'text-gray-700 hover:text-purple-600 dark:text-gray-300 dark:hover:text-purple-400 hover:bg-white/50 dark:hover:bg-gray-600/50'
+                          ? 'bg-white dark:bg-gray-500 text-purple-700 dark:text-purple-300 shadow-sm scale-[1.02]'
+                          : 'text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 hover:bg-white/60 dark:hover:bg-gray-600/60'
                       }`}
                     >
                       全部
@@ -446,10 +446,10 @@ function SourcesPageClient() {
                         <button
                           key={category.type_id}
                           onClick={() => handleCategoryChange(category.type_id)}
-                          className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-300 whitespace-nowrap ${
+                          className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap ${
                             isActive
-                              ? 'bg-white dark:bg-gray-500 text-purple-700 dark:text-purple-300 shadow-lg'
-                              : 'text-gray-700 hover:text-purple-600 dark:text-gray-300 dark:hover:text-purple-400 hover:bg-white/50 dark:hover:bg-gray-600/50'
+                              ? 'bg-white dark:bg-gray-500 text-purple-700 dark:text-purple-300 shadow-sm scale-[1.02]'
+                              : 'text-gray-600 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 hover:bg-white/60 dark:hover:bg-gray-600/60'
                           }`}
                         >
                           {category.type_name}
@@ -465,9 +465,9 @@ function SourcesPageClient() {
 
         {/* 错误提示 */}
         {selectedSource && !categoriesLoading && categoriesError && (
-          <div className='mb-6'>
-            <div className='bg-red-50 dark:bg-red-900/20 rounded-2xl border-2 border-red-200 dark:border-red-800 p-4'>
-              <h3 className='text-sm font-bold text-red-800 dark:text-red-200 mb-1'>
+          <div className='mb-4'>
+            <div className='bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 p-3'>
+              <h3 className='text-xs font-medium text-red-800 dark:text-red-200 mb-1'>
                 {selectedSourceName} - 分类加载失败
               </h3>
               <p className='text-xs text-red-700 dark:text-red-300'>
@@ -478,8 +478,8 @@ function SourcesPageClient() {
         )}
 
         {/* 内容展示区域 */}
-        <div className='max-w-[95%] mx-auto mt-12'>
-          <div className='grid grid-cols-3 gap-x-3 gap-y-16 px-0 sm:px-2 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:gap-x-8 sm:gap-y-24'>
+        <div className='max-w-[95%] mx-auto mt-6'>
+          <div className='grid grid-cols-3 gap-x-3 gap-y-12 px-0 sm:px-2 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:gap-x-6 sm:gap-y-16'>
             {loading
               ? skeletonData.map((index) => (
                   <div key={index} className='animate-pulse'>
@@ -514,7 +514,7 @@ function SourcesPageClient() {
                   (loadingRef as any).current = el;
                 }
               }}
-              className='flex justify-center mt-16 py-12'
+              className='flex justify-center mt-12 py-8'
             >
               {isLoadingMore && (
                 <div className='flex items-center gap-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-gray-200/50 dark:border-gray-600/50 shadow-lg'>
