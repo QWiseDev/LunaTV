@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Cat, Clover, Film, Home, Radio, Star, Tv } from 'lucide-react';
+import { Cat, Film, Home, Library, Radio, Star, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -38,9 +38,9 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       href: '/douban?type=anime',
     },
     {
-      icon: Clover,
-      label: '综艺',
-      href: '/douban?type=show',
+      icon: Library,
+      label: '视频源',
+      href: '/sources',
     },
     {
       icon: Radio,
@@ -73,7 +73,8 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
     return (
       decodedActive === decodedItemHref ||
       (decodedActive.startsWith('/douban') &&
-        decodedActive.includes(`type=${typeMatch}`))
+        decodedActive.includes(`type=${typeMatch}`)) ||
+      (href === '/sources' && decodedActive.startsWith('/sources'))
     );
   };
 

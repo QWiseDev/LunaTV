@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Cat, Clover, Film, Home, Menu, Radio, Search, Star, Tv } from 'lucide-react';
+import { Cat, Clover, Film, Home, Library, Menu, Radio, Search, Star, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -146,6 +146,11 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
       href: '/douban?type=show',
     },
     {
+      icon: Library,
+      label: '视频源',
+      href: '/sources',
+    },
+    {
       icon: Radio,
       label: '直播',
       href: '/live',
@@ -253,7 +258,8 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
                   const isActive =
                     decodedActive === decodedItemHref ||
                     (decodedActive.startsWith('/douban') &&
-                      decodedActive.includes(`type=${typeMatch}`));
+                      decodedActive.includes(`type=${typeMatch}`)) ||
+                    (item.href === '/sources' && decodedActive.startsWith('/sources'));
                   const Icon = item.icon;
                   return (
                     <Link
