@@ -267,7 +267,7 @@ function PlayPageClient() {
         }
       }
     }
-    return true;
+    return false;
   });
 
   // 保存优选时的测速结果，避免EpisodeSelector重复测速
