@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 const Grid = dynamic(
   () => import('react-window').then(mod => ({ default: mod.Grid })),
@@ -14,8 +14,9 @@ const Grid = dynamic(
 
 import { DoubanItem } from '@/lib/types';
 import { useResponsiveGrid } from '@/hooks/useResponsiveGrid';
-import VideoCard from '@/components/VideoCard';
+
 import DoubanCardSkeleton from '@/components/DoubanCardSkeleton';
+import VideoCard from '@/components/VideoCard';
 
 interface VirtualDoubanGridProps {
   // 豆瓣数据
