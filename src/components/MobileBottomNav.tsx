@@ -2,12 +2,7 @@
 
 'use client';
 
-import { Cat, Film, Home, Library, Radio, Star, Tv } from 'lucide-react';
->>>>>>> backup-local-commits
-import { Box, Cat, Clover, Film, Home, Library, Radio, Star, Tv } from 'lucide-react';
-=======
-import { Cat, Film, Home, Library, Radio, Star, Tv } from 'lucide-react';
->>>>>>> backup-local-commits
+import { Box, Cat, Film, Home, Library, Radio, Star, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
