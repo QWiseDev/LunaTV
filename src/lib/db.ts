@@ -33,7 +33,7 @@ function createStorage(): IStorage {
 // 单例存储实例
 let storageInstance: IStorage | null = null;
 
-function getStorage(): IStorage {
+export function getStorage(): IStorage {
   if (!storageInstance) {
     storageInstance = createStorage();
   }

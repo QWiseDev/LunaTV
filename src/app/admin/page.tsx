@@ -24,6 +24,7 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   AlertCircle,
   AlertTriangle,
+  BarChart3,
   Check,
   CheckCircle,
   ChevronDown,
@@ -38,6 +39,7 @@ import {
   Video,
 } from 'lucide-react';
 import { GripVertical } from 'lucide-react';
+import Image from 'next/image';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -300,6 +302,37 @@ interface CustomCategory {
   from: 'config' | 'custom';
 }
 
+// 播放记录类型定义
+interface PlayRecord {
+  title: string;
+  source_name: string;
+  cover: string;
+  year: string;
+  index: number;
+  total_episodes: number;
+  play_time: number;
+  total_time: number;
+  save_time: number;
+  search_title: string;
+}
+
+// 用户播放日志统计接口
+interface UserPlayLogStat {
+  username: string;
+  totalWatchTime: number; // 总观看时间（秒）
+  totalPlays: number; // 总播放次数
+  lastPlayTime: number; // 最后播放时间
+  recentRecords: PlayRecord[]; // 最近播放记录（最多10条）
+}
+
+// 播放日志汇总数据
+interface PlayLogsResult {
+  totalUsers: number; // 总用户数
+  totalWatchTime: number; // 全站总观看时间
+  totalPlays: number; // 全站总播放次数
+  userStats: UserPlayLogStat[]; // 每个用户的统计
+}
+
 // 可折叠标签组件
 interface CollapsibleTabProps {
   title: string;
@@ -338,7 +371,470 @@ const CollapsibleTab = ({
   );
 };
 
-// 用户配置组件
+// 播放日志管理组件
+const PlayLogsComponent = ({
+  config: _config,
+  refreshConfig: _refreshConfig,
+}: {
+  config: AdminConfig | null;
+  refreshConfig: () => Promise<void>;
+}) => {
+  const [playLogsData, setPlayLogsData] = useState<PlayLogsResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+
+  // 时间格式化函数
+  const formatTime = (seconds: number): string => {
+    if (seconds === 0) return '00:00';
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+
+    if (hours === 0) {
+      return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
+        .toString()
+        .padStart(2, '0')}`;
+    } else {
+      return `${hours.toString().padStart(2, '0')}:${minutes
+        .toString()
+        .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+  };
+
+  const formatDateTime = (timestamp: number): string => {
+    if (!timestamp) return '未知时间';
+
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '时间格式错误';
+
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  };
+
+  // 获取播放日志数据
+  const fetchPlayLogs = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/admin/logs');
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      setPlayLogsData(data);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : '获取播放日志失败';
+      setError(errorMessage);
+      console.error('获取播放日志失败:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 切换用户详情展开状态
+  const toggleUserExpanded = (username: string) => {
+    setExpandedUsers((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(username)) {
+        newSet.delete(username);
+      } else {
+        newSet.add(username);
+      }
+      return newSet;
+    });
+  };
+
+  // 获取进度百分比
+  const getProgressPercentage = (
+    playTime: number,
+    totalTime: number
+  ): number => {
+    if (!totalTime || totalTime === 0) return 0;
+    return Math.min(Math.round((playTime / totalTime) * 100), 100);
+  };
+
+  // 组件加载时获取数据
+  useEffect(() => {
+    if (_config) {
+      fetchPlayLogs();
+    }
+  }, [_config]);
+
+  if (!_config) {
+    return (
+      <div className='text-center text-gray-500 dark:text-gray-400'>
+        加载中...
+      </div>
+    );
+  }
+
+  // 检查是否支持播放日志（仅非本地存储模式支持）
+  const storageType =
+    typeof window !== 'undefined'
+      ? (window as any).RUNTIME_CONFIG?.STORAGE_TYPE || 'localstorage'
+      : 'localstorage';
+
+  if (storageType === 'localstorage') {
+    return (
+      <div className='space-y-4'>
+        <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800'>
+          <div className='flex items-center space-x-3'>
+            <div className='text-yellow-600 dark:text-yellow-400'>
+              <svg
+                className='w-5 h-5'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth='2'
+                  d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z'
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 className='text-sm font-medium text-yellow-800 dark:text-yellow-300'>
+                播放日志功能不可用
+              </h3>
+              <p className='text-yellow-700 dark:text-yellow-400 text-sm mt-1'>
+                当前使用本地存储模式（localStorage），不支持管理员查看播放日志。
+                <br />
+                如需使用此功能，请配置 Redis 或 Upstash 数据库存储。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className='space-y-4'>
+      {/* 刷新按钮 */}
+      <div className='flex justify-between items-center'>
+        <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+          播放日志统计
+        </h4>
+        <button
+          onClick={fetchPlayLogs}
+          disabled={loading}
+          className={`px-3 py-1.5 text-sm font-medium flex items-center space-x-2 ${
+            loading ? buttonStyles.disabled : buttonStyles.primary
+          }`}
+        >
+          <svg
+            className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth='2'
+              d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+            />
+          </svg>
+          <span>{loading ? '刷新中...' : '刷新数据'}</span>
+        </button>
+      </div>
+
+      {error && (
+        <div className='p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800'>
+          <div className='flex items-center space-x-2'>
+            <div className='text-red-600 dark:text-red-400'>
+              <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth='2'
+                  d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                />
+              </svg>
+            </div>
+            <div>
+              <h4 className='text-xs font-medium text-red-800 dark:text-red-300'>
+                获取播放日志失败
+              </h4>
+              <p className='text-red-700 dark:text-red-400 text-xs mt-1'>
+                {error}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className='text-center py-6'>
+          <div className='inline-flex items-center space-x-2 text-gray-600 dark:text-gray-400'>
+            <svg
+              className='w-4 h-4 animate-spin'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth='2'
+                d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+              />
+            </svg>
+            <span className='text-sm'>正在加载播放日志...</span>
+          </div>
+        </div>
+      )}
+
+      {playLogsData && (
+        <>
+          {/* 全站统计概览 */}
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+            <div className='p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800'>
+              <div className='text-xl font-bold text-blue-800 dark:text-blue-300'>
+                {playLogsData.totalUsers}
+              </div>
+              <div className='text-xs text-blue-600 dark:text-blue-400'>
+                总用户数
+              </div>
+            </div>
+            <div className='p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800'>
+              <div className='text-xl font-bold text-green-800 dark:text-green-300'>
+                {formatTime(playLogsData.totalWatchTime)}
+              </div>
+              <div className='text-xs text-green-600 dark:text-green-400'>
+                总观看时长
+              </div>
+            </div>
+            <div className='p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800'>
+              <div className='text-xl font-bold text-purple-800 dark:text-purple-300'>
+                {playLogsData.totalPlays}
+              </div>
+              <div className='text-xs text-purple-600 dark:text-purple-400'>
+                总播放次数
+              </div>
+            </div>
+          </div>
+
+          {/* 用户播放统计 */}
+          <div>
+            <h4 className='text-xs font-medium text-gray-700 dark:text-gray-300 mb-2'>
+              用户播放统计
+            </h4>
+            <div className='space-y-2'>
+              {playLogsData.userStats.map((userStat) => (
+                <div
+                  key={userStat.username}
+                  className='border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden'
+                >
+                  {/* 用户概览行 */}
+                  <div
+                    className='p-3 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
+                    onClick={() => toggleUserExpanded(userStat.username)}
+                  >
+                    <div className='flex items-center justify-between'>
+                      <div className='flex items-center space-x-3'>
+                        <div className='flex-shrink-0'>
+                          <div className='w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center'>
+                            <span className='text-xs font-medium text-blue-600 dark:text-blue-400'>
+                              {userStat.username.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <h5 className='text-xs font-medium text-gray-900 dark:text-gray-100'>
+                            {userStat.username}
+                          </h5>
+                          <p className='text-xs text-gray-500 dark:text-gray-400'>
+                            最后播放:{' '}
+                            {userStat.lastPlayTime
+                              ? formatDateTime(userStat.lastPlayTime)
+                              : '从未播放'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className='flex items-center space-x-4'>
+                        <div className='text-right'>
+                          <div className='text-xs font-medium text-gray-900 dark:text-gray-100'>
+                            {formatTime(userStat.totalWatchTime)}
+                          </div>
+                          <div className='text-xs text-gray-500 dark:text-gray-400'>
+                            观看时长
+                          </div>
+                        </div>
+                        <div className='text-right'>
+                          <div className='text-xs font-medium text-gray-900 dark:text-gray-100'>
+                            {userStat.totalPlays}
+                          </div>
+                          <div className='text-xs text-gray-500 dark:text-gray-400'>
+                            播放次数
+                          </div>
+                        </div>
+                        <div className='flex-shrink-0'>
+                          <svg
+                            className={`w-4 h-4 text-gray-400 transition-transform ${
+                              expandedUsers.has(userStat.username)
+                                ? 'rotate-180'
+                                : ''
+                            }`}
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth='2'
+                              d='M19 9l-7 7-7-7'
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 展开的播放记录详情 */}
+                  {expandedUsers.has(userStat.username) && (
+                    <div className='p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700'>
+                      {userStat.recentRecords.length > 0 ? (
+                        <>
+                          <h6 className='text-xs font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                            最近播放记录 (最多显示10条)
+                          </h6>
+                          <div className='space-y-2'>
+                            {userStat.recentRecords.map((record, index) => (
+                              <div
+                                key={index}
+                                className='flex items-center space-x-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg'
+                              >
+                                <div className='flex-shrink-0 w-10 h-12 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden'>
+                                  {record.cover ? (
+                                    <Image
+                                      src={record.cover}
+                                      alt={record.title}
+                                      width={40}
+                                      height={48}
+                                      className='w-full h-full object-cover'
+                                      onError={(e) => {
+                                        (
+                                          e.target as HTMLImageElement
+                                        ).style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className='w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500'>
+                                      <svg
+                                        className='w-4 h-4'
+                                        fill='none'
+                                        stroke='currentColor'
+                                        viewBox='0 0 24 24'
+                                      >
+                                        <path
+                                          strokeLinecap='round'
+                                          strokeLinejoin='round'
+                                          strokeWidth='2'
+                                          d='M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V1a1 1 0 011-1h2a1 1 0 011 1v3'
+                                        />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className='flex-1 min-w-0'>
+                                  <h6 className='text-xs font-medium text-gray-900 dark:text-gray-100 truncate'>
+                                    {record.title}
+                                  </h6>
+                                  <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                                    来源: {record.source_name} | 年份:{' '}
+                                    {record.year}
+                                  </p>
+                                  <p className='text-xs text-gray-500 dark:text-gray-400'>
+                                    第 {record.index + 1} 集 / 共{' '}
+                                    {record.total_episodes} 集
+                                  </p>
+                                  <div className='mt-1'>
+                                    <div className='flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1'>
+                                      <span>播放进度</span>
+                                      <span>
+                                        {formatTime(record.play_time)} /{' '}
+                                        {formatTime(record.total_time)}(
+                                        {getProgressPercentage(
+                                          record.play_time,
+                                          record.total_time
+                                        )}
+                                        %)
+                                      </span>
+                                    </div>
+                                    <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1'>
+                                      <div
+                                        className='bg-blue-500 h-1 rounded-full transition-all duration-300'
+                                        style={{
+                                          width: `${getProgressPercentage(
+                                            record.play_time,
+                                            record.total_time
+                                          )}%`,
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className='flex-shrink-0 text-right'>
+                                  <div className='text-xs text-gray-500 dark:text-gray-400'>
+                                    {formatDateTime(record.save_time)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <div className='text-center py-3 text-gray-500 dark:text-gray-400'>
+                          <svg
+                            className='w-8 h-8 mx-auto mb-1 text-gray-300 dark:text-gray-600'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth='2'
+                              d='M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0012 15c-2.239 0-4.236.18-6.101.532C4.294 15.661 4 16.28 4 16.917V19a2 2 0 002 2h12a2 2 0 002-2v-2.083c0-.636-.293-1.256-.899-1.385A7.962 7.962 0 0012 15z'
+                            />
+                          </svg>
+                          <span className='text-xs'>该用户暂无播放记录</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 interface UserConfigProps {
   config: AdminConfig | null;
   role: 'owner' | 'admin' | null;
@@ -4577,6 +5073,7 @@ function AdminPageClient() {
     categoryConfig: false,
     configFile: false,
     dataMigration: false,
+    playLogs: false,
   });
 
   // 获取管理员配置
@@ -4776,6 +5273,23 @@ function AdminPageClient() {
             >
               <CategoryConfig config={config} refreshConfig={fetchConfig} />
             </CollapsibleTab>
+
+            {/* 播放日志统计标签 - 只有管理员和站长可见 */}
+            {(role === 'admin' || role === 'owner') && (
+              <CollapsibleTab
+                title='播放日志统计'
+                icon={
+                  <BarChart3
+                    size={20}
+                    className='text-gray-600 dark:text-gray-400'
+                  />
+                }
+                isExpanded={expandedTabs.playLogs}
+                onToggle={() => toggleTab('playLogs')}
+              >
+                <PlayLogsComponent config={config} refreshConfig={fetchConfig} />
+              </CollapsibleTab>
+            )}
 
             {/* 数据迁移标签 - 仅站长可见 */}
             {role === 'owner' && (

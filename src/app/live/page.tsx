@@ -2,12 +2,11 @@
 
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
-
 import Artplayer from 'artplayer';
 import Hls from 'hls.js';
 import { Heart, Radio, Search, Tv, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
 
 import {
   debounce,
