@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Cat, Clover, Film, Home, Menu, PlaySquare, Radio, Search, Star, Tv } from 'lucide-react';
+import { BarChart3, Cat, Clover, Film, Home, Menu, Monitor, PlaySquare, Radio, Search, Star, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -154,6 +154,11 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
       icon: Radio,
       label: '直播',
       href: '/live',
+    },
+    {
+      icon: Monitor,
+      label: '源浏览器',
+      href: '/sources',
     },
     {
       icon: Tv,

@@ -3,6 +3,7 @@
 'use client';
 
 import {
+  BarChart3,
   Check,
   ChevronDown,
   ExternalLink,
@@ -273,6 +274,11 @@ export const UserMenu: React.FC = () => {
     router.push('/admin');
   };
 
+  const handlePlayStats = () => {
+    setIsOpen(false);
+    router.push('/play-stats');
+  };
+
   const handleChangePassword = () => {
     setIsOpen(false);
     setIsChangePasswordOpen(true);
@@ -534,6 +540,15 @@ export const UserMenu: React.FC = () => {
               <span className='font-medium'>管理面板</span>
             </button>
           )}
+
+          {/* 播放统计按钮 */}
+          <button
+            onClick={handlePlayStats}
+            className='w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm'
+          >
+            <BarChart3 className='w-4 h-4 text-gray-500 dark:text-gray-400' />
+            <span className='font-medium'>播放统计</span>
+          </button>
 
           {/* 修改密码按钮 */}
           {showChangePassword && (
