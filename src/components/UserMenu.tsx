@@ -279,6 +279,11 @@ export const UserMenu: React.FC = () => {
     router.push('/play-stats');
   };
 
+  const handleSourceTest = () => {
+    setIsOpen(false);
+    router.push('/source-test');
+  };
+
   const handleChangePassword = () => {
     setIsOpen(false);
     setIsChangePasswordOpen(true);
@@ -556,6 +561,17 @@ export const UserMenu: React.FC = () => {
               </span>
             </button>
           )}
+
+          {/* 源检测按钮 */}
+          <button
+            onClick={handleSourceTest}
+            className='w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm'
+          >
+            <svg className='w-4 h-4 text-gray-500 dark:text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+            </svg>
+            <span className='font-medium'>源检测</span>
+          </button>
 
           {/* 修改密码按钮 */}
           {showChangePassword && (
