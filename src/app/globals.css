@@ -175,21 +175,21 @@ div[data-media-provider] video {
   }
 }
 
-/* 修复音量控制hover区域 - 终极稳定方案 */
+/* 修复音量控制hover区域 - 精确优化版本 */
 .art-control-volume {
   position: relative !important;
 }
 
-/* 扩大音量控制按钮的hover检测区域 */
+/* 精确控制音量按钮的hover检测区域 */
 .art-control-volume::before {
   content: '';
   position: absolute;
-  top: -80px; /* 扩大到面板上方 */
-  left: -15px;
-  right: -15px;
-  bottom: -5px;
-  z-index: -1; /* 在后面，不阻挡点击 */
-  pointer-events: auto; /* 允许hover检测 */
+  top: -40px; /* 减少向上扩展，只扩展40px到音量滑条区域 */
+  left: -8px;  /* 减少左右扩展 */
+  right: -8px;
+  bottom: -2px; /* 减少向下扩展 */
+  z-index: -1;
+  pointer-events: auto;
 }
 
 /* 当面板本身被hover时也要保持显示 */
@@ -207,12 +207,26 @@ div[data-media-provider] video {
   transition: all 0.1s ease !important; /* 更快的响应 */
 }
 
-/* 修复移动端弹幕面板定位问题 */
+/* 修复移动端弹幕面板定位问题 - 根据不同挂载位置处理 */
 @media (max-width: 768px) {
-  .artplayer-plugin-danmuku .apd-config-panel,
-  .artplayer-plugin-danmuku .apd-style-panel {
-    left: 40% !important;
+  /* 当弹幕插件挂载到控制栏中心时（横屏，宽度>=512px） */
+  .art-controls-center .artplayer-plugin-danmuku .apd-config-panel,
+  .art-controls-center .artplayer-plugin-danmuku .apd-style-panel {
+    position: absolute !important; /* 加上这个关键属性！ */
+    left: 10% !important;
     transform: translateX(-50%) !important;
+    right: auto !important;
+    max-width: calc(100vw - 40px) !important;
+  }
+
+  /* 当弹幕插件挂载到播放器容器时（竖屏，宽度<512px） */
+  .art-video-player .artplayer-plugin-danmuku .apd-config-panel,
+  .art-video-player .artplayer-plugin-danmuku .apd-style-panel {
+    position: absolute !important;
+    left: 50% !important; /* 竖屏时居中 */
+    transform: translateX(-50%) !important;
+    right: auto !important;
+    max-width: calc(100vw - 40px) !important;
   }
 }
 
