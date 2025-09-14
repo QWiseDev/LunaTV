@@ -102,12 +102,31 @@ const SEARCH_HISTORY_LIMIT = 20;
 // ---- 缓存管理器 ----
 class HybridCacheManager {
   private static instance: HybridCacheManager;
+  private pendingRequests: Map<string, Promise<any>> = new Map();
 
   static getInstance(): HybridCacheManager {
     if (!HybridCacheManager.instance) {
       HybridCacheManager.instance = new HybridCacheManager();
     }
     return HybridCacheManager.instance;
+  }
+
+  /**
+   * 请求去重机制 - 防止同时发起多个相同的API请求
+   */
+  public getOrCreateRequest<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
+    if (this.pendingRequests.has(key)) {
+      return this.pendingRequests.get(key) as Promise<T>;
+    }
+    
+    const promise = requestFn()
+      .finally(() => {
+        // 请求完成后清理
+        this.pendingRequests.delete(key);
+      });
+    
+    this.pendingRequests.set(key, promise);
+    return promise;
   }
 
   /**
@@ -579,8 +598,10 @@ export async function getAllPlayRecords(): Promise<Record<string, PlayRecord>> {
     const cachedData = cacheManager.getCachedPlayRecords();
 
     if (cachedData) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<Record<string, PlayRecord>>(`/api/playrecords`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('playrecords-background-sync', () =>
+        fetchFromApi<Record<string, PlayRecord>>(`/api/playrecords`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedData) !== JSON.stringify(freshData)) {
@@ -600,10 +621,10 @@ export async function getAllPlayRecords(): Promise<Record<string, PlayRecord>> {
 
       return cachedData;
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<Record<string, PlayRecord>>(
-          `/api/playrecords`
+        const freshData = await cacheManager.getOrCreateRequest('playrecords-initial-fetch', () =>
+          fetchFromApi<Record<string, PlayRecord>>(`/api/playrecords`)
         );
         cacheManager.cachePlayRecords(freshData);
         return freshData;
@@ -768,8 +789,10 @@ export async function getSearchHistory(): Promise<string[]> {
     const cachedData = cacheManager.getCachedSearchHistory();
 
     if (cachedData) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<string[]>(`/api/searchhistory`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('searchhistory-background-sync', () =>
+        fetchFromApi<string[]>(`/api/searchhistory`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedData) !== JSON.stringify(freshData)) {
@@ -789,9 +812,11 @@ export async function getSearchHistory(): Promise<string[]> {
 
       return cachedData;
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<string[]>(`/api/searchhistory`);
+        const freshData = await cacheManager.getOrCreateRequest('searchhistory-initial-fetch', () =>
+          fetchFromApi<string[]>(`/api/searchhistory`)
+        );
         cacheManager.cacheSearchHistory(freshData);
         return freshData;
       } catch (err) {
@@ -989,8 +1014,10 @@ export async function getAllFavorites(): Promise<Record<string, Favorite>> {
     const cachedData = cacheManager.getCachedFavorites();
 
     if (cachedData) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('favorites-background-sync', () =>
+        fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedData) !== JSON.stringify(freshData)) {
@@ -1010,10 +1037,10 @@ export async function getAllFavorites(): Promise<Record<string, Favorite>> {
 
       return cachedData;
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<Record<string, Favorite>>(
-          `/api/favorites`
+        const freshData = await cacheManager.getOrCreateRequest('favorites-initial-fetch', () =>
+          fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
         );
         cacheManager.cacheFavorites(freshData);
         return freshData;
@@ -1175,8 +1202,10 @@ export async function isFavorited(
     const cachedFavorites = cacheManager.getCachedFavorites();
 
     if (cachedFavorites) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('favorites-background-sync', () =>
+        fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedFavorites) !== JSON.stringify(freshData)) {
@@ -1196,10 +1225,10 @@ export async function isFavorited(
 
       return !!cachedFavorites[key];
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<Record<string, Favorite>>(
-          `/api/favorites`
+        const freshData = await cacheManager.getOrCreateRequest('favorites-initial-fetch', () =>
+          fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
         );
         cacheManager.cacheFavorites(freshData);
         return !!freshData[key];
