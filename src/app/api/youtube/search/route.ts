@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
-import { getConfig } from '@/lib/config';
+import { getConfig, hasSpecialFeaturePermission } from '@/lib/config';
 import { db } from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -110,11 +110,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const username = authInfo.username;
+
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
   const contentType = searchParams.get('contentType') || 'all';
   const order = searchParams.get('order') || 'relevance';
-  
+
   if (!query) {
     return NextResponse.json({ error: '搜索关键词不能为空' }, { status: 400 });
   }
@@ -122,6 +124,23 @@ export async function GET(request: NextRequest) {
   try {
     // 获取YouTube配置
     const config = await getConfig();
+
+    // 检查用户是否有YouTube搜索功能权限（传入已获取的配置避免重复调用）
+    const hasPermission = await hasSpecialFeaturePermission(username, 'youtube-search', config);
+    if (!hasPermission) {
+      return NextResponse.json({
+        success: false,
+        error: '您无权使用YouTube搜索功能，请联系管理员开通权限'
+      }, {
+        status: 403,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Expires': '0',
+          'Pragma': 'no-cache',
+          'Surrogate-Control': 'no-store'
+        }
+      });
+    }
     const youtubeConfig = config.YouTubeConfig;
 
     // 检查YouTube功能是否启用
@@ -129,7 +148,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'YouTube搜索功能未启用'
-      }, { 
+      }, {
         status: 400,
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

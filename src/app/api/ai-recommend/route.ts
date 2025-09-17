@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
-import { getConfig } from '@/lib/config';
+import { getConfig, hasSpecialFeaturePermission } from '@/lib/config';
 import { db } from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -29,15 +29,31 @@ export async function POST(request: NextRequest) {
     }
 
     const username = authInfo.username;
-    
+
     // 获取配置检查AI功能是否启用
     const adminConfig = await getConfig();
+
+    // 检查用户是否有AI推荐功能权限（传入已获取的配置避免重复调用）
+    const hasPermission = await hasSpecialFeaturePermission(username, 'ai-recommend', adminConfig);
+    if (!hasPermission) {
+      return NextResponse.json({
+        error: '您无权使用AI推荐功能，请联系管理员开通权限'
+      }, {
+        status: 403,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Expires': '0',
+          'Pragma': 'no-cache',
+          'Surrogate-Control': 'no-store'
+        }
+      });
+    }
     const aiConfig = adminConfig.AIRecommendConfig;
-    
+
     if (!aiConfig?.enabled) {
-      return NextResponse.json({ 
-        error: 'AI推荐功能未启用' 
-      }, { 
+      return NextResponse.json({
+        error: 'AI推荐功能未启用'
+      }, {
         status: 403,
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

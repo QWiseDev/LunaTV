@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// 标记为动态路由
+// 强制动态路由，禁用所有缓存
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 // 服务端专用函数，直接调用外部API
 async function searchShortDramasInternal(
@@ -66,7 +68,27 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await searchShortDramasInternal(query, pageNum, pageSize);
-    return NextResponse.json(result);
+
+    // 设置与网页端一致的缓存策略（搜索结果: 1小时）
+    const response = NextResponse.json(result);
+
+    console.log('🕐 [SEARCH] 设置1小时HTTP缓存 - 与网页端搜索缓存一致');
+
+    // 1小时 = 3600秒（搜索结果更新频繁，短期缓存）
+    const cacheTime = 3600;
+    response.headers.set('Cache-Control', `public, max-age=${cacheTime}, s-maxage=${cacheTime}`);
+    response.headers.set('CDN-Cache-Control', `public, s-maxage=${cacheTime}`);
+    response.headers.set('Vercel-CDN-Cache-Control', `public, s-maxage=${cacheTime}`);
+
+    // 调试信息
+    response.headers.set('X-Cache-Duration', '1hour');
+    response.headers.set('X-Cache-Expires-At', new Date(Date.now() + cacheTime * 1000).toISOString());
+    response.headers.set('X-Debug-Timestamp', new Date().toISOString());
+
+    // Vary头确保不同设备有不同缓存
+    response.headers.set('Vary', 'Accept-Encoding, User-Agent');
+
+    return response;
   } catch (error) {
     console.error('搜索短剧失败:', error);
     return NextResponse.json(

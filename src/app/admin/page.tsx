@@ -1574,6 +1574,74 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                     ))}
                   </div>
 
+                  {/* 特殊功能权限 */}
+                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      特殊功能权限
+                    </label>
+                    <div className="space-y-3">
+                      {/* AI推荐功能 */}
+                      <label className="flex items-center space-x-3 p-3 border border-orange-200 dark:border-orange-700 rounded-lg bg-orange-50 dark:bg-orange-900/10 hover:bg-orange-100 dark:hover:bg-orange-900/20 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={newUserGroup.enabledApis.includes('ai-recommend')}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewUserGroup(prev => ({
+                                ...prev,
+                                enabledApis: [...prev.enabledApis, 'ai-recommend']
+                              }));
+                            } else {
+                              setNewUserGroup(prev => ({
+                                ...prev,
+                                enabledApis: prev.enabledApis.filter(api => api !== 'ai-recommend')
+                              }));
+                            }
+                          }}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500 dark:border-orange-600 dark:bg-orange-700"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                            🤖 AI推荐功能
+                          </div>
+                          <div className="text-xs text-orange-700 dark:text-orange-300">
+                            智能推荐影视内容 (消耗OpenAI API费用)
+                          </div>
+                        </div>
+                      </label>
+
+                      {/* YouTube搜索功能 */}
+                      <label className="flex items-center space-x-3 p-3 border border-red-200 dark:border-red-700 rounded-lg bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={newUserGroup.enabledApis.includes('youtube-search')}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewUserGroup(prev => ({
+                                ...prev,
+                                enabledApis: [...prev.enabledApis, 'youtube-search']
+                              }));
+                            } else {
+                              setNewUserGroup(prev => ({
+                                ...prev,
+                                enabledApis: prev.enabledApis.filter(api => api !== 'youtube-search')
+                              }));
+                            }
+                          }}
+                          className="rounded border-red-300 text-red-600 focus:ring-red-500 dark:border-red-600 dark:bg-red-700"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-red-900 dark:text-red-100">
+                            📺 YouTube搜索功能
+                          </div>
+                          <div className="text-xs text-red-700 dark:text-red-300">
+                            搜索和推荐YouTube视频 (消耗YouTube API配额)
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
                   {/* 快速操作按钮 */}
                   <div className='mt-4 flex space-x-2'>
                     <button
@@ -1585,7 +1653,8 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                     <button
                       onClick={() => {
                         const allApis = config?.SourceConfig?.filter(source => !source.disabled).map(s => s.key) || [];
-                        setNewUserGroup(prev => ({ ...prev, enabledApis: allApis }));
+                        const specialFeatures = ['ai-recommend', 'youtube-search'];
+                        setNewUserGroup(prev => ({ ...prev, enabledApis: [...allApis, ...specialFeatures] }));
                       }}
                       className={buttonStyles.quickAction}
                     >
@@ -1686,6 +1755,74 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                     ))}
                   </div>
 
+                  {/* 特殊功能权限 */}
+                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      特殊功能权限
+                    </label>
+                    <div className="space-y-3">
+                      {/* AI推荐功能 */}
+                      <label className="flex items-center space-x-3 p-3 border border-orange-200 dark:border-orange-700 rounded-lg bg-orange-50 dark:bg-orange-900/10 hover:bg-orange-100 dark:hover:bg-orange-900/20 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editingUserGroup.enabledApis.includes('ai-recommend')}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditingUserGroup(prev => prev ? {
+                                ...prev,
+                                enabledApis: [...prev.enabledApis, 'ai-recommend']
+                              } : null);
+                            } else {
+                              setEditingUserGroup(prev => prev ? {
+                                ...prev,
+                                enabledApis: prev.enabledApis.filter(api => api !== 'ai-recommend')
+                              } : null);
+                            }
+                          }}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500 dark:border-orange-600 dark:bg-orange-700"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                            🤖 AI推荐功能
+                          </div>
+                          <div className="text-xs text-orange-700 dark:text-orange-300">
+                            智能推荐影视内容 (消耗OpenAI API费用)
+                          </div>
+                        </div>
+                      </label>
+
+                      {/* YouTube搜索功能 */}
+                      <label className="flex items-center space-x-3 p-3 border border-red-200 dark:border-red-700 rounded-lg bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editingUserGroup.enabledApis.includes('youtube-search')}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditingUserGroup(prev => prev ? {
+                                ...prev,
+                                enabledApis: [...prev.enabledApis, 'youtube-search']
+                              } : null);
+                            } else {
+                              setEditingUserGroup(prev => prev ? {
+                                ...prev,
+                                enabledApis: prev.enabledApis.filter(api => api !== 'youtube-search')
+                              } : null);
+                            }
+                          }}
+                          className="rounded border-red-300 text-red-600 focus:ring-red-500 dark:border-red-600 dark:bg-red-700"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-red-900 dark:text-red-100">
+                            📺 YouTube搜索功能
+                          </div>
+                          <div className="text-xs text-red-700 dark:text-red-300">
+                            搜索和推荐YouTube视频 (消耗YouTube API配额)
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
                   {/* 快速操作按钮 */}
                   <div className='mt-4 flex space-x-2'>
                     <button
@@ -1697,7 +1834,8 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                     <button
                       onClick={() => {
                         const allApis = config?.SourceConfig?.filter(source => !source.disabled).map(s => s.key) || [];
-                        setEditingUserGroup(prev => prev ? { ...prev, enabledApis: allApis } : null);
+                        const specialFeatures = ['ai-recommend', 'youtube-search'];
+                        setEditingUserGroup(prev => prev ? { ...prev, enabledApis: [...allApis, ...specialFeatures] } : null);
                       }}
                       className={buttonStyles.quickAction}
                     >

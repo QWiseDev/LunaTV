@@ -40,20 +40,21 @@ async function cleanExpiredRateLimitCache(): Promise<void> {
   }
 }
 
-// TVBox源格式接口
+// TVBox源格式接口 (基于官方标准)
 interface TVBoxSource {
   key: string;
   name: string;
-  type: number; // 0=影视源, 1=直播源, 3=解析源
+  type: number; // 0=XML接口, 1=JSON接口, 3=Spider/JAR接口
   api: string;
   searchable?: number; // 0=不可搜索, 1=可搜索
   quickSearch?: number; // 0=不支持快速搜索, 1=支持快速搜索
   filterable?: number; // 0=不支持分类筛选, 1=支持分类筛选
-  ext?: string; // 扩展参数
-  jar?: string; // jar包地址
-  playUrl?: string; // 播放解析地址
-  categories?: string[]; // 分类
-  timeout?: number; // 超时时间(秒)
+  ext?: string; // 扩展数据字段，可包含配置规则或外部文件URL
+  jar?: string; // 自定义JAR文件地址
+  playerType?: number; // 播放器类型 (0: 系统, 1: ijk, 2: exo, 10: mxplayer, -1: 使用设置页默认)
+  playerUrl?: string; // 站点解析URL
+  categories?: string[]; // 自定义资源分类和排序
+  hide?: number; // 是否隐藏源站 (1: 隐藏, 0: 显示)
 }
 
 interface TVBoxConfig {
@@ -177,7 +178,7 @@ export async function GET(request: NextRequest) {
       wallpaper: `${baseUrl}/logo.png`, // 使用项目Logo作为壁纸
 
       // 影视源配置
-      sites: enabledSources.map((source) => {
+      sites: await Promise.all(enabledSources.map(async (source) => {
         // 智能的type判断逻辑：
         // 1. 如果api地址包含 "/provide/vod" 且不包含 "at/xml"，则认为是JSON类型 (type=1)
         // 2. 如果api地址包含 "at/xml"，则认为是XML类型 (type=0)
@@ -192,6 +193,35 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // 动态获取源站分类
+        let categories: string[] = ["电影", "电视剧", "综艺", "动漫", "纪录片", "短剧"]; // 默认分类
+
+        try {
+          // 尝试获取源站的分类数据
+          const categoriesUrl = `${source.api}?ac=list`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
+          const response = await fetch(categoriesUrl, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'TVBox/1.0.0'
+            }
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.class && Array.isArray(data.class)) {
+              categories = data.class.map((cat: any) => cat.type_name || cat.name).filter((name: string) => name);
+            }
+          }
+        } catch (error) {
+          // 获取分类失败时使用默认分类
+          console.warn(`获取源站 ${source.name} 分类失败，使用默认分类:`, error);
+        }
+
         return {
           key: source.key || source.name,
           name: source.name,
@@ -200,13 +230,12 @@ export async function GET(request: NextRequest) {
           searchable: 1, // 可搜索
           quickSearch: 1, // 支持快速搜索
           filterable: 1, // 支持分类筛选
-          ext: source.detail || source.api, // 如果没有详情地址，使用API地址作为详情地址
-          timeout: 30, // 30秒超时
-          categories: [
-            "电影", "电视剧", "综艺", "动漫", "纪录片", "短剧"
-          ]
+          ext: '', // 扩展数据字段，用于配置规则或外部文件URL
+          playerUrl: '', // 站点解析URL
+          hide: 0, // 是否隐藏源站 (1: 隐藏, 0: 显示)
+          categories: categories // 使用动态获取的分类
         };
-      }),
+      })),
 
       // 解析源配置（添加一些常用的解析源）
       parses: [

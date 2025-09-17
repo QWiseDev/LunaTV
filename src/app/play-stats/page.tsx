@@ -227,7 +227,7 @@ const PlayStatsPage: React.FC = () => {
   // 未授权时显示加载
   if (!authInfo) {
     return (
-      <PageLayout>
+      <PageLayout activePath="/play-stats">
         <div className='text-center py-12'>
           <div className='inline-flex items-center space-x-2 text-gray-600 dark:text-gray-400'>
             <svg
@@ -252,7 +252,7 @@ const PlayStatsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <PageLayout>
+      <PageLayout activePath="/play-stats">
         <div className='text-center py-12'>
           <div className='inline-flex items-center space-x-2 text-gray-600 dark:text-gray-400'>
             <svg
@@ -277,7 +277,7 @@ const PlayStatsPage: React.FC = () => {
 
   if (storageType === 'localstorage') {
     return (
-      <PageLayout>
+      <PageLayout activePath="/play-stats">
         <div className='max-w-6xl mx-auto px-4 py-8'>
           <div className='mb-8'>
             <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
@@ -325,7 +325,7 @@ const PlayStatsPage: React.FC = () => {
   // 渲染管理员统计页面
   if (isAdmin && statsData) {
     return (
-      <PageLayout>
+      <PageLayout activePath="/play-stats">
         <div className='max-w-7xl mx-auto px-4 py-8'>
           {/* 页面标题和刷新按钮 */}
           <div className='flex justify-between items-center mb-8'>
@@ -713,7 +713,7 @@ const PlayStatsPage: React.FC = () => {
   // 渲染普通用户个人统计页面
   if (!isAdmin && userStats) {
     return (
-      <PageLayout>
+      <PageLayout activePath="/play-stats">
         <div className='max-w-6xl mx-auto px-4 py-8'>
           {/* 页面标题和刷新按钮 */}
           <div className='flex justify-between items-center mb-8'>
@@ -932,7 +932,7 @@ const PlayStatsPage: React.FC = () => {
 
   // 加载中或错误状态
   return (
-    <PageLayout>
+    <PageLayout activePath="/play-stats">
       <div className='max-w-6xl mx-auto px-4 py-8'>
         <div className='text-center py-12'>
           {error ? (

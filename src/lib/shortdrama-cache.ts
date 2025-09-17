@@ -106,6 +106,22 @@ async function cleanExpiredCache(): Promise<void> {
   }
 }
 
+// 初始化缓存系统（参考豆瓣实现）
+async function initShortdramaCache(): Promise<void> {
+  // 立即清理一次过期缓存
+  await cleanExpiredCache();
+
+  // 每10分钟清理一次过期缓存
+  setInterval(() => cleanExpiredCache(), 10 * 60 * 1000);
+
+  console.log('短剧缓存系统已初始化');
+}
+
+// 在模块加载时初始化缓存系统
+if (typeof window !== 'undefined') {
+  initShortdramaCache().catch(console.error);
+}
+
 export {
   SHORTDRAMA_CACHE_EXPIRE,
   getCacheKey,

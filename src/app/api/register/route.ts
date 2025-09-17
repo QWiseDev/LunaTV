@@ -141,12 +141,12 @@ export async function POST(req: NextRequest) {
         username: username,
         role: 'user' as const,
       };
-      
+
       config.UserConfig.Users.push(newUser);
-      
+
       // 保存更新后的配置
       await db.saveAdminConfig(config);
-      
+
       // 清除缓存，确保下次获取配置时是最新的
       clearConfigCache();
 

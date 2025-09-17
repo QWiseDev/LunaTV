@@ -513,3 +513,56 @@ export async function getAvailableApiSites(user?: string): Promise<ApiSite[]> {
 export async function setCachedConfig(config: AdminConfig) {
   cachedConfig = config;
 }
+
+// 特殊功能权限检查
+export async function hasSpecialFeaturePermission(
+  username: string,
+  feature: 'ai-recommend' | 'youtube-search',
+  providedConfig?: AdminConfig
+): Promise<boolean> {
+  try {
+    // 站长默认拥有所有权限
+    if (username === process.env.USERNAME) {
+      return true;
+    }
+
+    // 使用提供的配置或获取新配置
+    const config = providedConfig || await getConfig();
+    const userConfig = config.UserConfig.Users.find((u) => u.username === username);
+
+    // 如果用户不在配置中，检查是否是新注册用户
+    if (!userConfig) {
+      // 新注册用户默认无特殊功能权限，但不阻止基本访问
+      // 这里返回false是正确的，因为新用户默认不应该有AI/YouTube权限
+      return false;
+    }
+
+    // 管理员默认拥有所有权限
+    if (userConfig.role === 'admin') {
+      return true;
+    }
+
+    // 普通用户需要检查特殊功能权限
+    // 优先检查用户直接配置的 enabledApis
+    if (userConfig.enabledApis && userConfig.enabledApis.length > 0) {
+      return userConfig.enabledApis.includes(feature);
+    }
+
+    // 如果没有直接配置，检查用户组 tags 的权限
+    if (userConfig.tags && userConfig.tags.length > 0 && config.UserConfig.Tags) {
+      for (const tagName of userConfig.tags) {
+        const tagConfig = config.UserConfig.Tags.find(t => t.name === tagName);
+        if (tagConfig && tagConfig.enabledApis && tagConfig.enabledApis.includes(feature)) {
+          return true;
+        }
+      }
+    }
+
+    // 默认情况下，普通用户无权使用特殊功能
+    return false;
+  } catch (error) {
+    console.error('权限检查失败:', error);
+    // 出错时，如果是站长则返回true，否则返回false
+    return username === process.env.USERNAME;
+  }
+}

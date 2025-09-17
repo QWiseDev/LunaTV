@@ -34,20 +34,27 @@ export async function getShortDramaCategories(): Promise<ShortDramaCategory[]> {
   const cacheKey = getCacheKey('categories', {});
 
   try {
-    // 尝试从缓存获取
-    const cached = await getCache(cacheKey);
-    if (cached) {
-      return cached;
+    // 临时禁用缓存进行测试 - 移动端强制刷新
+    if (!isMobile()) {
+      const cached = await getCache(cacheKey);
+      if (cached) {
+        return cached;
+      }
     }
 
-    const apiUrl = getApiBase('/categories');
+    const apiUrl = isMobile()
+      ? `/api/shortdrama/categories`
+      : getApiBase('/categories');
 
-    // 移动端使用内部API，不需要headers
-    const fetchOptions = isMobile() ? {} : {
+    // 移动端使用内部API，桌面端调用外部API
+    const fetchOptions: RequestInit = isMobile() ? {
+      // 移动端：让浏览器使用HTTP缓存，不添加破坏缓存的headers
+    } : {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json',
       },
+      mode: 'cors',
     };
 
     const response = await fetch(apiUrl, fetchOptions);
@@ -87,21 +94,26 @@ export async function getRecommendedShortDramas(
   const cacheKey = getCacheKey('recommends', { category, size });
 
   try {
-    // 尝试从缓存获取
-    const cached = await getCache(cacheKey);
-    if (cached) {
-      return cached;
+    // 临时禁用缓存进行测试 - 移动端强制刷新
+    if (!isMobile()) {
+      const cached = await getCache(cacheKey);
+      if (cached) {
+        return cached;
+      }
     }
 
     const apiUrl = isMobile()
       ? `/api/shortdrama/recommend?${category ? `category=${category}&` : ''}size=${size}`
       : `${SHORTDRAMA_API_BASE}/vod/recommend?${category ? `category=${category}&` : ''}size=${size}`;
 
-    const fetchOptions = isMobile() ? {} : {
+    const fetchOptions: RequestInit = isMobile() ? {
+      // 移动端：让浏览器使用HTTP缓存，不添加破坏缓存的headers
+    } : {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json',
       },
+      mode: 'cors',
     };
 
     const response = await fetch(apiUrl, fetchOptions);
@@ -147,21 +159,26 @@ export async function getShortDramaList(
   const cacheKey = getCacheKey('lists', { category, page, size });
 
   try {
-    // 尝试从缓存获取
-    const cached = await getCache(cacheKey);
-    if (cached) {
-      return cached;
+    // 临时禁用缓存进行测试 - 移动端强制刷新
+    if (!isMobile()) {
+      const cached = await getCache(cacheKey);
+      if (cached) {
+        return cached;
+      }
     }
 
     const apiUrl = isMobile()
       ? `/api/shortdrama/list?categoryId=${category}&page=${page}&size=${size}`
       : `${SHORTDRAMA_API_BASE}/vod/list?categoryId=${category}&page=${page}&size=${size}`;
 
-    const fetchOptions = isMobile() ? {} : {
+    const fetchOptions: RequestInit = isMobile() ? {
+      // 移动端：让浏览器使用HTTP缓存，不添加破坏缓存的headers
+    } : {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json',
       },
+      mode: 'cors',
     };
 
     const response = await fetch(apiUrl, fetchOptions);
@@ -211,37 +228,51 @@ export async function searchShortDramas(
   size = 20
 ): Promise<{ list: ShortDramaItem[]; hasMore: boolean }> {
   try {
-    const response = await fetch(
-      `${SHORTDRAMA_API_BASE}/vod/search?name=${encodeURIComponent(query)}&page=${page}&size=${size}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-        },
-      }
-    );
+    const apiUrl = isMobile()
+      ? `/api/shortdrama/search?name=${encodeURIComponent(query)}&page=${page}&size=${size}`
+      : `${SHORTDRAMA_API_BASE}/vod/search?name=${encodeURIComponent(query)}&page=${page}&size=${size}`;
+
+    const fetchOptions: RequestInit = isMobile() ? {
+      // 移动端：让浏览器使用HTTP缓存，不添加破坏缓存的headers
+    } : {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+      mode: 'cors',
+    };
+
+    const response = await fetch(apiUrl, fetchOptions);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    // 根据实际API返回调整字段映射
-    const items = data.list || [];
-    const list = items.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      cover: item.cover,
-      update_time: item.update_time || new Date().toISOString(),
-      score: item.score || 0,
-      episode_count: 1, // 搜索API没有集数信息，ShortDramaCard会自动获取
-      description: item.description || '',
-    }));
 
-    return {
-      list,
-      hasMore: data.currentPage < data.totalPages,
-    };
+    let result: { list: ShortDramaItem[]; hasMore: boolean };
+    if (isMobile()) {
+      result = data; // 内部API已经处理过格式
+    } else {
+      // 外部API的处理逻辑
+      const items = data.list || [];
+      const list = items.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        cover: item.cover,
+        update_time: item.update_time || new Date().toISOString(),
+        score: item.score || 0,
+        episode_count: 1, // 搜索API没有集数信息，ShortDramaCard会自动获取
+        description: item.description || '',
+      }));
+
+      result = {
+        list,
+        hasMore: data.currentPage < data.totalPages,
+      };
+    }
+
+    return result;
   } catch (error) {
     console.error('搜索短剧失败:', error);
     return { list: [], hasMore: false };
@@ -264,15 +295,27 @@ export async function parseShortDramaEpisode(
       params.append('proxy', 'true');
     }
 
-    const response = await fetch(
-      `${SHORTDRAMA_API_BASE}/vod/parse/single?${params.toString()}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-        },
+    const timestamp = Date.now();
+    const apiUrl = isMobile()
+      ? `/api/shortdrama/parse?${params.toString()}&_t=${timestamp}`
+      : `${SHORTDRAMA_API_BASE}/vod/parse/single?${params.toString()}`;
+
+    const fetchOptions: RequestInit = isMobile() ? {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
-    );
+    } : {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+      mode: 'cors',
+    };
+
+    const response = await fetch(apiUrl, fetchOptions);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -328,15 +371,27 @@ export async function parseShortDramaBatch(
       params.append('proxy', 'true');
     }
 
-    const response = await fetch(
-      `${SHORTDRAMA_API_BASE}/vod/parse/batch?${params.toString()}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-        },
+    const timestamp = Date.now();
+    const apiUrl = isMobile()
+      ? `/api/shortdrama/parse?${params.toString()}&_t=${timestamp}`
+      : `${SHORTDRAMA_API_BASE}/vod/parse/batch?${params.toString()}`;
+
+    const fetchOptions: RequestInit = isMobile() ? {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
-    );
+    } : {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+      mode: 'cors',
+    };
+
+    const response = await fetch(apiUrl, fetchOptions);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -364,15 +419,27 @@ export async function parseShortDramaAll(
       params.append('proxy', 'true');
     }
 
-    const response = await fetch(
-      `${SHORTDRAMA_API_BASE}/vod/parse/all?${params.toString()}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-        },
+    const timestamp = Date.now();
+    const apiUrl = isMobile()
+      ? `/api/shortdrama/parse?${params.toString()}&_t=${timestamp}`
+      : `${SHORTDRAMA_API_BASE}/vod/parse/all?${params.toString()}`;
+
+    const fetchOptions: RequestInit = isMobile() ? {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
-    );
+    } : {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+      mode: 'cors',
+    };
+
+    const response = await fetch(apiUrl, fetchOptions);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

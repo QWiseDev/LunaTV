@@ -2,11 +2,14 @@
 
 'use client';
 
-import Hls from 'hls.js';
-import { ChevronUp,Heart } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
+import Hls from 'hls.js';
+import { Heart, ChevronUp } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
+import EpisodeSelector from '@/components/EpisodeSelector';
+import NetDiskSearchResults from '@/components/NetDiskSearchResults';
+import PageLayout from '@/components/PageLayout';
 import artplayerPluginChromecast from '@/lib/artplayer-plugin-chromecast';
 import { ClientCache } from '@/lib/client-cache';
 import {
@@ -25,10 +28,6 @@ import {
 import { getDoubanDetails } from '@/lib/douban.client';
 import { SearchResult } from '@/lib/types';
 import { getVideoResolutionFromM3u8, processImageUrl } from '@/lib/utils';
-
-import EpisodeSelector from '@/components/EpisodeSelector';
-import NetDiskSearchResults from '@/components/NetDiskSearchResults';
-import PageLayout from '@/components/PageLayout';
 
 // 扩展 HTMLVideoElement 类型以支持 hls 属性
 declare global {
@@ -278,7 +277,7 @@ function PlayPageClient() {
         }
       }
     }
-    return true;
+    return false;
   });
 
   // 保存优选时的测速结果，避免EpisodeSelector重复测速
@@ -559,7 +558,7 @@ function PlayPageClient() {
     }
   };
 
-  // 播放源优选函数（优化：边测速边播放，减少等待时间）
+  // 播放源优选函数（针对旧iPad做极端保守优化）
   const preferBestSource = async (
     sources: SearchResult[]
   ): Promise<SearchResult> => {
@@ -610,8 +609,8 @@ function PlayPageClient() {
       return await lightweightPreference(sources);
     }
 
-    // 桌面设备使用智能测速（边测速边播放）
-    return await smartSpeedTest(sources);
+    // 桌面设备使用原来的测速方法（控制并发）
+    return await fullSpeedTest(sources);
   };
 
   // 轻量级优选：仅测试连通性，不创建video和HLS
@@ -667,208 +666,130 @@ function PlayPageClient() {
     return sortedResults[0].source;
   };
 
-  // 智能测速（桌面设备）- 边测速边播放，减少等待时间
-  const smartSpeedTest = async (sources: SearchResult[]): Promise<SearchResult> => {
-    console.log('🚀 开始智能测速，边测速边播放');
-    
-    // 第一阶段：快速连通性测试，找到第一个可用源立即开始播放
-    const quickTestPromises = sources.map(async (source, index) => {
-      try {
-        if (!source.episodes || source.episodes.length === 0) {
-          return { source, index, available: false, pingTime: 9999 };
-        }
+  // 完整测速（桌面设备）
+  const fullSpeedTest = async (sources: SearchResult[]): Promise<SearchResult> => {
+    // 桌面设备使用小批量并发，避免创建过多实例
+    const concurrency = 2;
+    const allResults: Array<{
+      source: SearchResult;
+      testResult: { quality: string; loadSpeed: string; pingTime: number };
+    } | null> = [];
 
-        const episodeUrl = source.episodes.length > 1 
-          ? source.episodes[1] 
-          : source.episodes[0];
-        
-        const startTime = performance.now();
-        // 快速HEAD请求测试连通性
-        await fetch(episodeUrl, { 
-          method: 'HEAD', 
-          mode: 'no-cors',
-          signal: AbortSignal.timeout(2000) // 2秒超时，快速响应
-        });
-        const pingTime = performance.now() - startTime;
-        
-        return { 
-          source, 
-          index,
-          available: true, 
-          pingTime: Math.round(pingTime)
-        };
-      } catch (error) {
-        return { source, index, available: false, pingTime: 9999 };
+    for (let i = 0; i < sources.length; i += concurrency) {
+      const batch = sources.slice(i, i + concurrency);
+      console.log(`测速批次 ${Math.floor(i/concurrency) + 1}/${Math.ceil(sources.length/concurrency)}: ${batch.length} 个源`);
+      
+      const batchResults = await Promise.all(
+        batch.map(async (source) => {
+          try {
+            if (!source.episodes || source.episodes.length === 0) {
+              return null;
+            }
+
+            const episodeUrl = source.episodes.length > 1
+              ? source.episodes[1]
+              : source.episodes[0];
+            
+            const testResult = await getVideoResolutionFromM3u8(episodeUrl);
+            return { source, testResult };
+          } catch (error) {
+            console.warn(`测速失败: ${source.source_name}`, error);
+            return null;
+          }
+        })
+      );
+      
+      allResults.push(...batchResults);
+      
+      // 批次间延迟，让资源有时间清理
+      if (i + concurrency < sources.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    // 等待所有测速完成，包含成功和失败的结果
+    // 保存所有测速结果到 precomputedVideoInfo，供 EpisodeSelector 使用（包含错误结果）
+    const newVideoInfoMap = new Map<
+      string,
+      {
+        quality: string;
+        loadSpeed: string;
+        pingTime: number;
+        hasError?: boolean;
+      }
+    >();
+    allResults.forEach((result, index) => {
+      const source = sources[index];
+      const sourceKey = `${source.source}-${source.id}`;
+
+      if (result) {
+        // 成功的结果
+        newVideoInfoMap.set(sourceKey, result.testResult);
       }
     });
 
-    // 等待第一个可用源或所有快速测试完成
-    let firstAvailableSource: SearchResult | null = null;
-    let quickTestResults: Array<{ source: SearchResult; index: number; available: boolean; pingTime: number }> = [];
+    // 过滤出成功的结果用于优选计算
+    const successfulResults = allResults.filter(Boolean) as Array<{
+      source: SearchResult;
+      testResult: { quality: string; loadSpeed: string; pingTime: number };
+    }>;
 
-    try {
-      // 使用Promise.allSettled确保所有测试都能完成
-      const results = await Promise.allSettled(quickTestPromises);
-      quickTestResults = results
-        .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-        .map(result => result.value)
-        .sort((a, b) => a.index - b.index); // 保持原始顺序
+    setPrecomputedVideoInfo(newVideoInfoMap);
 
-      // 找到第一个可用源
-      const availableSources = quickTestResults
-        .filter(result => result.available)
-        .sort((a, b) => a.pingTime - b.pingTime); // 按响应时间排序
-
-      if (availableSources.length > 0) {
-        firstAvailableSource = availableSources[0].source;
-        console.log(`✅ 快速测试完成，找到可用源: ${firstAvailableSource.source_name} (${availableSources[0].pingTime}ms)`);
-      }
-    } catch (error) {
-      console.warn('快速测试出错:', error);
-    }
-
-    // 如果没找到可用源，返回第一个源
-    if (!firstAvailableSource) {
-      console.warn('快速测试未找到可用源，使用第一个源');
+    if (successfulResults.length === 0) {
+      console.warn('所有播放源测速都失败，使用第一个播放源');
       return sources[0];
     }
 
-    // 第二阶段：在后台继续详细测速，但不阻塞播放
-    // 启动后台详细测速（异步进行，不阻塞返回）
-    const backgroundSpeedTest = async () => {
-      try {
-        console.log('🔄 后台开始详细测速...');
-        
-        // 只对可用的源进行详细测速，减少资源消耗
-        const availableSources = quickTestResults
-          .filter(result => result.available)
-          .map(result => result.source);
+    // 找出所有有效速度的最大值，用于线性映射
+    const validSpeeds = successfulResults
+      .map((result) => {
+        const speedStr = result.testResult.loadSpeed;
+        if (speedStr === '未知' || speedStr === '测量中...') return 0;
 
-        if (availableSources.length <= 1) {
-          console.log('只有一个可用源，跳过详细测速');
-          return;
-        }
+        const match = speedStr.match(/^([\d.]+)\s*(KB\/s|MB\/s)$/);
+        if (!match) return 0;
 
-        // 并发测速，但限制并发数
-        const concurrency = Math.min(3, availableSources.length);
-        const detailedResults: Array<{
-          source: SearchResult;
-          testResult: { quality: string; loadSpeed: string; pingTime: number };
-        } | null> = [];
+        const value = parseFloat(match[1]);
+        const unit = match[2];
+        return unit === 'MB/s' ? value * 1024 : value; // 统一转换为 KB/s
+      })
+      .filter((speed) => speed > 0);
 
-        for (let i = 0; i < availableSources.length; i += concurrency) {
-          const batch = availableSources.slice(i, i + concurrency);
-          
-          const batchResults = await Promise.allSettled(
-            batch.map(async (source) => {
-              try {
-                const episodeUrl = source.episodes.length > 1
-                  ? source.episodes[1]
-                  : source.episodes[0];
-                
-                const testResult = await getVideoResolutionFromM3u8(episodeUrl);
-                return { source, testResult };
-              } catch (error) {
-                console.warn(`详细测速失败: ${source.source_name}`, error);
-                return null;
-              }
-            })
-          );
-          
-          // 收集成功的结果
-          batchResults.forEach(result => {
-            if (result.status === 'fulfilled' && result.value) {
-              detailedResults.push(result.value);
-            }
-          });
-          
-          // 批次间短暂延迟
-          if (i + concurrency < availableSources.length) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        }
+    const maxSpeed = validSpeeds.length > 0 ? Math.max(...validSpeeds) : 1024; // 默认1MB/s作为基准
 
-        // 更新测速结果到全局状态
-        const newVideoInfoMap = new Map<
-          string,
-          { quality: string; loadSpeed: string; pingTime: number }
-        >();
-        
-        detailedResults.forEach((result) => {
-          if (result) {
-            const sourceKey = `${result.source.source}-${result.source.id}`;
-            newVideoInfoMap.set(sourceKey, result.testResult);
-          }
-        });
+    // 找出所有有效延迟的最小值和最大值，用于线性映射
+    const validPings = successfulResults
+      .map((result) => result.testResult.pingTime)
+      .filter((ping) => ping > 0);
 
-        // 合并快速测试的结果
-        quickTestResults.forEach((quickResult) => {
-          const sourceKey = `${quickResult.source.source}-${quickResult.source.id}`;
-          if (!newVideoInfoMap.has(sourceKey) && quickResult.available) {
-            // 为快速测试的结果添加基础信息
-            newVideoInfoMap.set(sourceKey, {
-              quality: '未知',
-              loadSpeed: '测量中...',
-              pingTime: quickResult.pingTime
-            });
-          }
-        });
+    const minPing = validPings.length > 0 ? Math.min(...validPings) : 50;
+    const maxPing = validPings.length > 0 ? Math.max(...validPings) : 1000;
 
-        setPrecomputedVideoInfo(newVideoInfoMap);
-        console.log(`✅ 后台详细测速完成，共测试 ${detailedResults.length} 个源`);
+    // 计算每个结果的评分
+    const resultsWithScore = successfulResults.map((result) => ({
+      ...result,
+      score: calculateSourceScore(
+        result.testResult,
+        maxSpeed,
+        minPing,
+        maxPing
+      ),
+    }));
 
-        // 如果发现更好的源，可以在这里通知用户（可选）
-        if (detailedResults.length > 1) {
-          const successfulResults = detailedResults.filter(Boolean) as Array<{
-            source: SearchResult;
-            testResult: { quality: string; loadSpeed: string; pingTime: number };
-          }>;
+    // 按综合评分排序，选择最佳播放源
+    resultsWithScore.sort((a, b) => b.score - a.score);
 
-          if (successfulResults.length > 0) {
-            // 计算最佳源
-            const validSpeeds = successfulResults
-              .map((result) => {
-                const speedStr = result.testResult.loadSpeed;
-                if (speedStr === '未知' || speedStr === '测量中...') return 0;
-                const match = speedStr.match(/^([\d.]+)\s*(KB\/s|MB\/s)$/);
-                if (!match) return 0;
-                const value = parseFloat(match[1]);
-                const unit = match[2];
-                return unit === 'MB/s' ? value * 1024 : value;
-              })
-              .filter((speed) => speed > 0);
+    console.log('播放源评分排序结果:');
+    resultsWithScore.forEach((result, index) => {
+      console.log(
+        `${index + 1}. ${result.source.source_name
+        } - 评分: ${result.score.toFixed(2)} (${result.testResult.quality}, ${result.testResult.loadSpeed
+        }, ${result.testResult.pingTime}ms)`
+      );
+    });
 
-            const maxSpeed = validSpeeds.length > 0 ? Math.max(...validSpeeds) : 1024;
-            const validPings = successfulResults.map((result) => result.testResult.pingTime).filter((ping) => ping > 0);
-            const minPing = validPings.length > 0 ? Math.min(...validPings) : 50;
-            const maxPing = validPings.length > 0 ? Math.max(...validPings) : 1000;
-
-            const resultsWithScore = successfulResults.map((result) => ({
-              ...result,
-              score: calculateSourceScore(result.testResult, maxSpeed, minPing, maxPing),
-            }));
-
-            resultsWithScore.sort((a, b) => b.score - a.score);
-            
-            console.log('📊 后台测速排序结果:');
-            resultsWithScore.forEach((result, index) => {
-              console.log(
-                `${index + 1}. ${result.source.source_name} - 评分: ${result.score.toFixed(2)} (${result.testResult.quality}, ${result.testResult.loadSpeed}, ${result.testResult.pingTime}ms)`
-              );
-            });
-          }
-        }
-      } catch (error) {
-        console.error('后台详细测速失败:', error);
-      }
-    };
-
-    // 启动后台测速（不等待完成）
-    backgroundSpeedTest().catch(console.error);
-
-    // 立即返回第一个可用源，让播放尽快开始
-    console.log(`🎬 立即开始播放: ${firstAvailableSource.source_name}`);
-    return firstAvailableSource;
+    return resultsWithScore[0].source;
   };
 
   // 计算播放源综合评分
@@ -2631,7 +2552,7 @@ function PlayPageClient() {
             const devicePerformance = getDevicePerformance()
             console.log(`🎯 设备性能等级: ${devicePerformance}`)
             
-            // 🚀 根据设备性能调整弹幕渲染策略（不减少数量）
+            // 🚀 激进性能优化：针对大量弹幕的渲染策略
             const getOptimizedConfig = () => {
               const baseConfig = {
                 danmuku: [], // 初始为空数组，后续通过load方法加载
@@ -2639,43 +2560,82 @@ function PlayPageClient() {
                 opacity: parseFloat(localStorage.getItem('danmaku_opacity') || '0.8'),
                 fontSize: parseInt(localStorage.getItem('danmaku_fontSize') || '25'),
                 color: '#FFFFFF',
-                mode: 0 as const, // 修正类型：使用 const assertion
+                mode: 0 as const,
                 modes: JSON.parse(localStorage.getItem('danmaku_modes') || '[0, 1, 2]') as Array<0 | 1 | 2>,
                 margin: JSON.parse(localStorage.getItem('danmaku_margin') || '[10, "75%"]') as [number | `${number}%`, number | `${number}%`],
                 visible: localStorage.getItem('danmaku_visible') !== 'false',
                 emitter: false,
                 maxLength: 50,
-                lockTime: 2, // v5.2.0优化: 减少锁定时间，降低快进时的延迟
+                lockTime: 1, // 🎯 进一步减少锁定时间，提升进度跳转响应
                 theme: 'dark' as const,
                 width: 300,
+
+                // 🎯 激进优化配置 - 保持功能完整性
+                antiOverlap: devicePerformance === 'high', // 只有高性能设备开启防重叠，避免重叠计算
+                synchronousPlayback: true, // ✅ 必须保持true！确保弹幕与视频播放速度同步
+                heatmap: false, // 关闭热力图，减少DOM计算开销
                 
-                // 🧠 智能过滤器 - 只过滤有问题的弹幕，不减少数量
+                // 🧠 智能过滤器 - 激进性能优化，过滤影响性能的弹幕
                 filter: (danmu: any) => {
-                  // 过滤空弹幕
+                  // 基础验证
                   if (!danmu.text || !danmu.text.trim()) return false
-                  
-                  // 过滤超长弹幕（影响性能）
-                  if (danmu.text.length > 100) return false
-                  
-                  // 过滤可能导致渲染问题的特殊字符
-                  const specialCharCount = (danmu.text.match(/[^\u4e00-\u9fa5a-zA-Z0-9\s.,!?；，。！？]/g) || []).length
-                  if (specialCharCount > 10) return false
-                  
-                  return true // 保持尽可能多的弹幕
+
+                  const text = danmu.text.trim();
+
+                  // 🔥 激进长度限制，减少DOM渲染负担
+                  if (text.length > 50) return false // 从100改为50，更激进
+                  if (text.length < 2) return false  // 过短弹幕通常无意义
+
+                  // 🔥 激进特殊字符过滤，避免复杂渲染
+                  const specialCharCount = (text.match(/[^\u4e00-\u9fa5a-zA-Z0-9\s.,!?；，。！？]/g) || []).length
+                  if (specialCharCount > 5) return false // 从10改为5，更严格
+
+                  // 🔥 过滤纯数字或纯符号弹幕，减少无意义渲染
+                  if (/^\d+$/.test(text)) return false
+                  if (/^[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]+$/.test(text)) return false
+
+                  // 🔥 过滤常见低质量弹幕，提升整体质量
+                  const lowQualityPatterns = [
+                    /^666+$/, /^好+$/, /^哈+$/, /^啊+$/,
+                    /^[!！.。？?]+$/, /^牛+$/, /^强+$/
+                  ];
+                  if (lowQualityPatterns.some(pattern => pattern.test(text))) return false
+
+                  return true
                 },
                 
-                // 🎯 保持原有的 beforeVisible 逻辑，只添加性能优化
+                // 🚀 激进性能优化的动态密度控制
                 beforeVisible: (danmu: any) => {
                   return new Promise<boolean>((resolve) => {
-                    // 低性能设备添加CSS动画优化
-                    if (devicePerformance === 'low' && danmu.$ref && danmu.mode === 0) {
-                      // 添加硬件加速样式
-                      danmu.$ref.classList.add('art-danmuku-optimized')
-                      danmu.$ref.style.willChange = 'transform'
-                      danmu.$ref.style.backfaceVisibility = 'hidden'
+                    // 🎯 动态弹幕密度控制 - 根据当前屏幕上的弹幕数量决定是否显示
+                    const currentVisibleCount = document.querySelectorAll('.art-danmuku [data-state="emit"]').length;
+                    const maxConcurrentDanmu = devicePerformance === 'high' ? 60 :
+                                             devicePerformance === 'medium' ? 40 : 25;
+
+                    if (currentVisibleCount >= maxConcurrentDanmu) {
+                      // 🔥 当弹幕密度过高时，随机丢弃部分弹幕，保持流畅性
+                      const dropRate = devicePerformance === 'high' ? 0.1 :
+                                      devicePerformance === 'medium' ? 0.3 : 0.5;
+                      if (Math.random() < dropRate) {
+                        resolve(false); // 丢弃当前弹幕
+                        return;
+                      }
                     }
-                    resolve(true)
-                  })
+
+                    // 🎯 硬件加速优化
+                    if (danmu.$ref && danmu.mode === 0) {
+                      danmu.$ref.style.willChange = 'transform';
+                      danmu.$ref.style.backfaceVisibility = 'hidden';
+
+                      // 低性能设备额外优化
+                      if (devicePerformance === 'low') {
+                        danmu.$ref.style.transform = 'translateZ(0)'; // 强制硬件加速
+                        danmu.$ref.classList.add('art-danmuku-optimized');
+                      }
+                    }
+
+                    resolve(true);
+                  });
                 },
               }
               
