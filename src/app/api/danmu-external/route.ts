@@ -865,21 +865,34 @@ export async function GET(request: NextRequest) {
     // 按时间排序
     allDanmu.sort((a, b) => a.time - b.time);
 
-    // 去重处理：移除相同时间和内容的重复弹幕
+    // 🚀 优化去重处理：更精确的重复检测
     const uniqueDanmu: DanmuItem[] = [];
     const seenMap = new Map<string, boolean>();
-    
-    allDanmu.forEach(danmu => {
-      // 创建唯一标识：时间(秒，保留1位小数) + 文本内容
-      const uniqueKey = `${Math.round(danmu.time * 10) / 10}_${danmu.text.trim()}`;
-      
-      if (!seenMap.has(uniqueKey)) {
-        seenMap.set(uniqueKey, true);
-        uniqueDanmu.push(danmu);
+
+    // 批量处理去重，避免阻塞
+    const DEDUP_BATCH_SIZE = 100;
+    for (let i = 0; i < allDanmu.length; i += DEDUP_BATCH_SIZE) {
+      const batch = allDanmu.slice(i, i + DEDUP_BATCH_SIZE);
+
+      batch.forEach(danmu => {
+        // 创建更精确的唯一标识：时间(保留2位小数) + 文本内容 + 颜色
+        const normalizedText = danmu.text.trim().toLowerCase();
+        const timeKey = Math.round(danmu.time * 100) / 100; // 精确到0.01秒
+        const uniqueKey = `${timeKey}_${normalizedText}_${danmu.color || 'default'}`;
+
+        if (!seenMap.has(uniqueKey)) {
+          seenMap.set(uniqueKey, true);
+          uniqueDanmu.push(danmu);
+        }
+      });
+
+      // 让出执行权，避免阻塞
+      if (i % (DEDUP_BATCH_SIZE * 5) === 0) {
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
-    });
-    
-    console.log(`弹幕去重: ${allDanmu.length} -> ${uniqueDanmu.length} 条`);
+    }
+
+    console.log(`🎯 弹幕去重优化: ${allDanmu.length} -> ${uniqueDanmu.length} 条`);
 
     return NextResponse.json({
       danmu: uniqueDanmu,
