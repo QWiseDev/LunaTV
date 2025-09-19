@@ -123,6 +123,9 @@ export const VirtualDoubanGrid: React.FC<VirtualDoubanGridProps> = ({
   // 网格行数计算
   const rowCount = Math.ceil(displayItemCount / columnCount);
 
+  // 单行网格优化：确保单行时布局正确（react-window 2.1.1修复了相关bug）
+  const isSingleRow = rowCount === 1;
+
   // 渲染单个网格项 - 支持react-window v2.1.0的ariaAttributes
   const CellComponent = useCallback(({ 
     ariaAttributes,
@@ -219,6 +222,11 @@ export const VirtualDoubanGrid: React.FC<VirtualDoubanGridProps> = ({
             overflowY: 'auto',
             // 确保不创建新的stacking context，让菜单能正确显示在最顶层
             isolation: 'auto',
+            // 单行网格优化：防止高度异常
+            ...(isSingleRow && {
+              minHeight: itemHeight + 16,
+              maxHeight: itemHeight + 32,
+            }),
           }}
           onCellsRendered={(visibleCells, allCells) => {
             // 使用react-window v2.1.0的新API - 优化性能：
