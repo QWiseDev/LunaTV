@@ -8,8 +8,8 @@ import { getBaseUrl, resolveUrl } from "@/lib/live";
 export const runtime = 'nodejs';
 
 // 连接池管理
-import * as https from 'https';
 import * as http from 'http';
+import * as https from 'https';
 
 const httpsAgent = new https.Agent({
   keepAlive: true,
@@ -257,7 +257,7 @@ function rewriteM3U8Content(content: string, baseUrl: string, req: Request, allo
     // 处理 TS 片段 URL 和其他媒体文件
     if (line && !line.startsWith('#')) {
       const resolvedUrl = resolveUrl(baseUrl, line);
-      const proxyUrl = allowCORS ? resolvedUrl : `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+      const proxyUrl = allowCORS ? resolvedUrl : `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
       rewrittenLines.push(proxyUrl);
       continue;
     }
@@ -392,7 +392,7 @@ function rewriteMapUri(line: string, baseUrl: string, proxyBase: string, variabl
       originalUri = substituteVariables(originalUri, variables);
     }
     const resolvedUrl = resolveUrl(baseUrl, originalUri);
-    const proxyUrl = `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+    const proxyUrl = `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
     return line.replace(uriMatch[0], `URI="${proxyUrl}"`);
   }
   return line;
@@ -454,7 +454,7 @@ function rewritePartUri(line: string, baseUrl: string, proxyBase: string, variab
       originalUri = substituteVariables(originalUri, variables);
     }
     const resolvedUrl = resolveUrl(baseUrl, originalUri);
-    const proxyUrl = `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+    const proxyUrl = `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
     return line.replace(uriMatch[0], `URI="${proxyUrl}"`);
   }
   return line;
@@ -484,7 +484,7 @@ function rewriteSessionDataUri(line: string, baseUrl: string, proxyBase: string,
       originalUri = substituteVariables(originalUri, variables);
     }
     const resolvedUrl = resolveUrl(baseUrl, originalUri);
-    const proxyUrl = `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+    const proxyUrl = `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
     return line.replace(uriMatch[0], `URI="${proxyUrl}"`);
   }
   return line;
@@ -520,7 +520,7 @@ function rewriteDateRangeUri(line: string, baseUrl: string, proxyBase: string, v
       }
       try {
         const resolvedUrl = resolveUrl(baseUrl, uri);
-        const proxyUrl = `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+        const proxyUrl = `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
         result = result.replace(fullMatch, fullMatch.replace(originalUri, proxyUrl));
       } catch (error) {
         // 保持原始 URI 如果解析失败
@@ -548,11 +548,11 @@ function rewritePreloadHintUri(line: string, baseUrl: string, proxyBase: string,
       
       let proxyUrl: string;
       if (type === 'PART') {
-        proxyUrl = `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+        proxyUrl = `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
       } else if (type === 'MAP') {
-        proxyUrl = `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+        proxyUrl = `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
       } else {
-        proxyUrl = `${proxyBase}/segment?url=${encodeURIComponent(resolvedUrl)}`;
+        proxyUrl = `https://api.r2afosne.dpdns.org/proxy/video?url=${encodeURIComponent(resolvedUrl)}`;
       }
       
       return line.replace(uriMatch[0], `URI="${proxyUrl}"`);
