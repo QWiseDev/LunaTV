@@ -433,10 +433,12 @@ function LivePageClient() {
       );
 
       // 默认选中第一个频道
+      let selectedChannel: LiveChannel | null = null;
       if (channels.length > 0) {
         if (needLoadChannel) {
           const foundChannel = channels.find((c: LiveChannel) => c.id === needLoadChannel);
           if (foundChannel) {
+            selectedChannel = foundChannel;
             setCurrentChannel(foundChannel);
             setVideoUrl(foundChannel.url);
             // 延迟滚动到选中的频道
@@ -444,10 +446,12 @@ function LivePageClient() {
               scrollToChannel(foundChannel);
             }, 200);
           } else {
+            selectedChannel = channels[0];
             setCurrentChannel(channels[0]);
             setVideoUrl(channels[0].url);
           }
         } else {
+          selectedChannel = channels[0];
           setCurrentChannel(channels[0]);
           setVideoUrl(channels[0].url);
         }
@@ -493,6 +497,33 @@ function LivePageClient() {
         }, 500); // 增加延迟时间，确保状态更新和DOM渲染完成
       }
 
+      // 🔑 关键修复：首次加载时也要加载选中频道的 EPG 数据
+      if (selectedChannel && selectedChannel.tvgId) {
+        try {
+          setIsEpgLoading(true);
+          const epgResponse = await fetch(`/api/live/epg?source=${source.key}&tvgId=${selectedChannel.tvgId}`);
+          if (epgResponse.ok) {
+            const epgResult = await epgResponse.json();
+            if (epgResult.success) {
+              // 清洗EPG数据，去除重叠的节目
+              const cleanedData = {
+                ...epgResult.data,
+                programs: cleanEpgData(epgResult.data.programs)
+              };
+              setEpgData(cleanedData);
+            }
+          }
+        } catch (error) {
+          console.error('获取节目单信息失败:', error);
+        } finally {
+          setIsEpgLoading(false);
+        }
+      } else {
+        // 如果没有 tvgId，清空 EPG 数据
+        setEpgData(null);
+        setIsEpgLoading(false);
+      }
+
       setIsVideoLoading(false);
     } catch (err) {
       console.error('获取频道列表失败:', err);
@@ -510,7 +541,7 @@ function LivePageClient() {
 
       setIsVideoLoading(false);
     }
-  };
+  };;
 
   // 切换直播源
   const handleSourceChange = async (source: LiveSource) => {
