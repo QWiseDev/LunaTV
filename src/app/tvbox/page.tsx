@@ -1,6 +1,14 @@
 'use client';
 
-import { AlertTriangle, Monitor, Shield, Smartphone, Tv } from 'lucide-react';
+import {
+  AlertTriangle,
+  Monitor,
+  Shield,
+  ShieldOff,
+  Smartphone,
+  Tv,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import PageLayout from '@/components/PageLayout';
@@ -15,10 +23,14 @@ interface SecurityConfig {
 }
 
 export default function TVBoxConfigPage() {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [format, setFormat] = useState<'json' | 'base64'>('json');
   const [securityConfig, setSecurityConfig] = useState<SecurityConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessStatus, setAccessStatus] = useState<
+    'checking' | 'authorized' | 'unauthorized'
+  >('checking');
 
   // 获取安全配置
   const fetchSecurityConfig = useCallback(async () => {
@@ -36,8 +48,43 @@ export default function TVBoxConfigPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const verifyAccess = async () => {
+      try {
+        const response = await fetch('/api/admin/role', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error('forbidden');
+        }
+
+        if (!cancelled) {
+          setAccessStatus('authorized');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAccessStatus('unauthorized');
+          setLoading(false);
+        }
+      }
+    };
+
+    verifyAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (accessStatus !== 'authorized') {
+      return;
+    }
     fetchSecurityConfig();
-  }, [fetchSecurityConfig]);
+  }, [accessStatus, fetchSecurityConfig]);
 
   const getConfigUrl = useCallback(() => {
     if (typeof window === 'undefined') return '';
@@ -61,6 +108,44 @@ export default function TVBoxConfigPage() {
       // Copy failed silently
     }
   };
+
+  if (accessStatus === 'checking') {
+    return (
+      <PageLayout activePath="/tvbox">
+        <div className="flex items-center justify-center min-h-[60vh] px-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            正在校验访问权限...
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (accessStatus === 'unauthorized') {
+    return (
+      <PageLayout activePath="/tvbox">
+        <div className="flex items-center justify-center min-h-[60vh] px-4">
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-8 text-center space-y-4">
+            <div className="flex items-center justify-center w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-xl mx-auto">
+              <ShieldOff className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              无访问权限
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-6">
+              TVBox 配置仅向管理员开放，请联系站长或管理员开启访问权限。
+            </p>
+            <button
+              onClick={() => router.replace('/')}
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+            >
+              返回首页
+            </button>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout activePath="/tvbox">
