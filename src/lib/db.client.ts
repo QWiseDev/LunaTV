@@ -98,12 +98,31 @@ const SEARCH_HISTORY_LIMIT = 20;
 // ---- 缓存管理器 ----
 class HybridCacheManager {
   private static instance: HybridCacheManager;
+  private pendingRequests: Map<string, Promise<any>> = new Map();
 
   static getInstance(): HybridCacheManager {
     if (!HybridCacheManager.instance) {
       HybridCacheManager.instance = new HybridCacheManager();
     }
     return HybridCacheManager.instance;
+  }
+
+  /**
+   * 请求去重机制 - 防止同时发起多个相同的API请求
+   */
+  public getOrCreateRequest<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
+    if (this.pendingRequests.has(key)) {
+      return this.pendingRequests.get(key) as Promise<T>;
+    }
+    
+    const promise = requestFn()
+      .finally(() => {
+        // 请求完成后清理
+        this.pendingRequests.delete(key);
+      });
+    
+    this.pendingRequests.set(key, promise);
+    return promise;
   }
 
   /**
@@ -605,46 +624,54 @@ export function generateStorageKey(source: string, id: string): string {
 
 /**
  * 检查是否应该更新原始集数
- * 更新条件（所有条件都必须满足）：
- * 1. 用户观看了超过原始集数的集数（说明看了新更新的内容）
- * 2. 当前总集数比原始集数多（确实有新集数）
- * 3. 用户观看进度有实质性进展（防止误触）
- * 4. 新集数增加量合理（防止API错误数据）
- * 5. 用户观看的新集数超过原始集数至少1集（确保真的看了新内容）
+ * 更新条件（全部满足才更新）：
+ * 1. 用户观看进度超过原始集数（说明追到新内容）
+ * 2. 当前总集数比原始集数更多（确认真的有更新）
+ * 3. 观看时长超过 5 分钟（过滤误触）
+ * 4. 新增集数增量合理（避免接口异常）
+ * 5. 用户观看的新集数至少多 1 集
  */
-function checkShouldUpdateOriginalEpisodes(existingRecord: PlayRecord, newRecord: PlayRecord): boolean {
+function checkShouldUpdateOriginalEpisodes(
+  existingRecord: PlayRecord,
+  newRecord: PlayRecord
+): boolean {
   const originalEpisodes = existingRecord.original_episodes || existingRecord.total_episodes;
 
-  // 条件1：用户观看进度超过了原始集数（说明用户已经看了新更新的集数）
+  // 条件1：用户观看进度超过原始集数，说明追到了新更新
   const hasWatchedBeyondOriginal = newRecord.index > originalEpisodes;
 
-  // 条件2：当前总集数确实比原始集数多（确认有新更新）
+  // 条件2：当前总集数确实比原始集数多
   const hasMoreEpisodes = newRecord.total_episodes > originalEpisodes;
 
-  // 条件3：用户观看进度有实质性进展（不是刚点进去就退出）
-  const hasSignificantProgress = newRecord.play_time > 300; // 观看超过5分钟，更严格
+  // 条件3：观看时长超过 5 分钟，防止用户只是试播
+  const hasSignificantProgress = newRecord.play_time > 300;
 
-  // 条件4：新集数增加量合理（防止API返回异常大的数字）
+  // 条件4：新增集数增量合理，避免接口异常导致大幅跳变
   const episodeIncrement = newRecord.total_episodes - originalEpisodes;
-  const reasonableIncrement = episodeIncrement > 0 && episodeIncrement <= 50; // 最多增加50集
+  const reasonableIncrement = episodeIncrement > 0 && episodeIncrement <= 50;
 
-  // 条件5：用户确实观看了新集数超过原始集数至少1集
+  // 条件5：用户观看的新集数至少比原始集数多 1 集
   const watchedNewEpisodes = newRecord.index >= originalEpisodes + 1;
 
-  // 条件6：观看进度与集数匹配（防止数据不一致）
+  // 条件6：观看进度与总集数匹配，避免脏数据
   const progressMatches = newRecord.index <= newRecord.total_episodes;
 
-  const shouldUpdate = hasWatchedBeyondOriginal &&
-                      hasMoreEpisodes &&
-                      hasSignificantProgress &&
-                      reasonableIncrement &&
-                      watchedNewEpisodes &&
-                      progressMatches;
+  const shouldUpdate =
+    hasWatchedBeyondOriginal &&
+    hasMoreEpisodes &&
+    hasSignificantProgress &&
+    reasonableIncrement &&
+    watchedNewEpisodes &&
+    progressMatches;
 
   if (shouldUpdate) {
-    console.log(`✓ 检测到应更新原始集数: ${existingRecord.title} - 观看到第${newRecord.index}集，超过原始${originalEpisodes}集，当前总${newRecord.total_episodes}集，增加${episodeIncrement}集`);
+    console.log(
+      `✓ 检测到应更新原始集数: ${existingRecord.title} - 观看到第${newRecord.index}集，超过原始${originalEpisodes}集，当前总${newRecord.total_episodes}集，增加${episodeIncrement}集`
+    );
   } else {
-    console.log(`✗ 不更新原始集数: ${existingRecord.title} - 观看第${newRecord.index}集，原始${originalEpisodes}集，当前总${newRecord.total_episodes}集 [超过原始:${hasWatchedBeyondOriginal}, 有新集:${hasMoreEpisodes}, 观看时长足够:${hasSignificantProgress}, 增量合理:${reasonableIncrement}, 看了新集:${watchedNewEpisodes}, 进度匹配:${progressMatches}]`);
+    console.log(
+      `✗ 不更新原始集数: ${existingRecord.title} - 观看第${newRecord.index}集，原始${originalEpisodes}集，当前总${newRecord.total_episodes}集 [超过原始:${hasWatchedBeyondOriginal}, 有新集:${hasMoreEpisodes}, 观看时长足够:${hasSignificantProgress}, 增量合理:${reasonableIncrement}, 看了新集:${watchedNewEpisodes}, 进度匹配:${progressMatches}]`
+    );
   }
 
   return shouldUpdate;
@@ -668,8 +695,10 @@ export async function getAllPlayRecords(): Promise<Record<string, PlayRecord>> {
     const cachedData = cacheManager.getCachedPlayRecords();
 
     if (cachedData) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<Record<string, PlayRecord>>(`/api/playrecords`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('playrecords-background-sync', () =>
+        fetchFromApi<Record<string, PlayRecord>>(`/api/playrecords`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedData) !== JSON.stringify(freshData)) {
@@ -689,10 +718,10 @@ export async function getAllPlayRecords(): Promise<Record<string, PlayRecord>> {
 
       return cachedData;
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<Record<string, PlayRecord>>(
-          `/api/playrecords`
+        const freshData = await cacheManager.getOrCreateRequest('playrecords-initial-fetch', () =>
+          fetchFromApi<Record<string, PlayRecord>>(`/api/playrecords`)
         );
         cacheManager.cachePlayRecords(freshData);
         return freshData;
@@ -727,26 +756,22 @@ export async function savePlayRecord(
 ): Promise<void> {
   const key = generateStorageKey(source, id);
 
-  // 获取现有播放记录，检查是否需要设置原始集数
   const existingRecords = await getAllPlayRecords();
   const existingRecord = existingRecords[key];
 
-  // 如果是首次保存该记录，且总集数大于1，则保存原始集数
   if (!existingRecord && record.total_episodes > 1) {
     record.original_episodes = record.total_episodes;
     console.log(`✓ 首次保存原始集数: ${key} = ${record.total_episodes}集`);
   } else if (existingRecord && !existingRecord.original_episodes && record.total_episodes > 1) {
-    // 如果现有记录没有原始集数，补充保存
     record.original_episodes = record.total_episodes;
     console.log(`✓ 补充保存原始集数: ${key} = ${record.total_episodes}集`);
   } else if (existingRecord?.original_episodes) {
-    // 检查是否需要更新原始集数
-    const shouldUpdateOriginal = checkShouldUpdateOriginalEpisodes(existingRecord, record);
-    if (shouldUpdateOriginal) {
+    if (checkShouldUpdateOriginalEpisodes(existingRecord, record)) {
       record.original_episodes = record.total_episodes;
-      console.log(`✓ 更新原始集数: ${key} = ${existingRecord.original_episodes}集 -> ${record.total_episodes}集`);
+      console.log(
+        `✓ 更新原始集数: ${key} = ${existingRecord.original_episodes}集 -> ${record.total_episodes}集`
+      );
     } else {
-      // 保持现有的原始集数不变
       record.original_episodes = existingRecord.original_episodes;
     }
   }
@@ -891,8 +916,10 @@ export async function getSearchHistory(): Promise<string[]> {
     const cachedData = cacheManager.getCachedSearchHistory();
 
     if (cachedData) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<string[]>(`/api/searchhistory`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('searchhistory-background-sync', () =>
+        fetchFromApi<string[]>(`/api/searchhistory`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedData) !== JSON.stringify(freshData)) {
@@ -912,9 +939,11 @@ export async function getSearchHistory(): Promise<string[]> {
 
       return cachedData;
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<string[]>(`/api/searchhistory`);
+        const freshData = await cacheManager.getOrCreateRequest('searchhistory-initial-fetch', () =>
+          fetchFromApi<string[]>(`/api/searchhistory`)
+        );
         cacheManager.cacheSearchHistory(freshData);
         return freshData;
       } catch (err) {
@@ -1112,8 +1141,10 @@ export async function getAllFavorites(): Promise<Record<string, Favorite>> {
     const cachedData = cacheManager.getCachedFavorites();
 
     if (cachedData) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('favorites-background-sync', () =>
+        fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedData) !== JSON.stringify(freshData)) {
@@ -1133,10 +1164,10 @@ export async function getAllFavorites(): Promise<Record<string, Favorite>> {
 
       return cachedData;
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<Record<string, Favorite>>(
-          `/api/favorites`
+        const freshData = await cacheManager.getOrCreateRequest('favorites-initial-fetch', () =>
+          fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
         );
         cacheManager.cacheFavorites(freshData);
         return freshData;
@@ -1298,8 +1329,10 @@ export async function isFavorited(
     const cachedFavorites = cacheManager.getCachedFavorites();
 
     if (cachedFavorites) {
-      // 返回缓存数据，同时后台异步更新
-      fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      // 返回缓存数据，同时后台异步更新（使用去重机制）
+      cacheManager.getOrCreateRequest('favorites-background-sync', () =>
+        fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
+      )
         .then((freshData) => {
           // 只有数据真正不同时才更新缓存
           if (JSON.stringify(cachedFavorites) !== JSON.stringify(freshData)) {
@@ -1319,10 +1352,10 @@ export async function isFavorited(
 
       return !!cachedFavorites[key];
     } else {
-      // 缓存为空，直接从 API 获取并缓存
+      // 缓存为空，使用去重机制从 API 获取并缓存
       try {
-        const freshData = await fetchFromApi<Record<string, Favorite>>(
-          `/api/favorites`
+        const freshData = await cacheManager.getOrCreateRequest('favorites-initial-fetch', () =>
+          fetchFromApi<Record<string, Favorite>>(`/api/favorites`)
         );
         cacheManager.cacheFavorites(freshData);
         return !!freshData[key];
