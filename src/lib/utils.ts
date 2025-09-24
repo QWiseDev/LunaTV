@@ -134,6 +134,17 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
   loadSpeed: string;
   pingTime: number;
 }> {
+  // 简单缓存，避免重复对同一URL测速（15分钟）
+  const CACHE_TTL_MS = 15 * 60 * 1000;
+  const nowTs = Date.now();
+  (window as any).__resolutionInfoCache = (window as any).__resolutionInfoCache || new Map<string, any>();
+  const cache: Map<string, { quality: string; loadSpeed: string; pingTime: number; ts: number }>
+    = (window as any).__resolutionInfoCache;
+  const cached = cache.get(m3u8Url);
+  if (cached && nowTs - cached.ts < CACHE_TTL_MS) {
+    return { quality: cached.quality, loadSpeed: cached.loadSpeed, pingTime: cached.pingTime };
+  }
+
   try {
     // 检测是否为iPad（无论什么浏览器）
     const isIPad = /iPad/i.test(userAgent);
@@ -165,7 +176,63 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
       }
     }
     
-    // 非iPad设备使用优化后的测速逻辑
+    // 尝试快速路径：仅解析清单（不挂载video，不加载分片）
+    const tryFastManifest = (): Promise<{ quality: string; loadSpeed: string; pingTime: number } | null> => {
+      return new Promise((resolveFast) => {
+        let done = false;
+        let hls: Hls | null = null;
+        const finish = (result: { quality: string; loadSpeed: string; pingTime: number } | null) => {
+          if (!done) {
+            done = true;
+            if (hls && typeof hls.destroy === 'function') {
+              hls.destroy();
+            }
+            resolveFast(result);
+          }
+        };
+
+        const pingStartFast = performance.now();
+        let pingTimeFast = 0;
+        const pingPromiseFast = fetch(m3u8Url, { method: 'HEAD', mode: 'no-cors' })
+          .then(() => { pingTimeFast = performance.now() - pingStartFast; })
+          .catch(() => { pingTimeFast = performance.now() - pingStartFast; });
+
+        hls = new Hls({ debug: false, enableWorker: false });
+        const timeout = setTimeout(() => finish(null), isMobile ? 1500 : 2000);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, async (_evt: any, data: any) => {
+          clearTimeout(timeout);
+          await pingPromiseFast;
+          // 选择最高分辨率/码率的level
+          const levels = Array.isArray(data?.levels) ? data.levels : [];
+          if (!levels.length) return finish(null);
+          levels.sort((a: any, b: any) => (b.height || 0) - (a.height || 0) || (b.bitrate || 0) - (a.bitrate || 0));
+          const best = levels[0];
+          const height = best?.height || 0;
+          const bitrate = best?.bitrate || 0; // bps
+          const quality = height >= 2160 ? '4K' : height >= 1440 ? '2K' : height >= 1080 ? '1080p' : height >= 720 ? '720p' : height >= 480 ? '480p' : height > 0 ? 'SD' : '未知';
+          // 由码率估算下载速度（近似）：bitrate(bps)/8 -> B/s
+          const speedKBps = bitrate > 0 ? (bitrate / 8) / 1024 : 0;
+          const loadSpeed = speedKBps >= 1024 ? `${(speedKBps / 1024).toFixed(2)} MB/s` : speedKBps > 0 ? `${speedKBps.toFixed(2)} KB/s` : '未知';
+          finish({ quality, loadSpeed, pingTime: Math.round(pingTimeFast) });
+        });
+
+        hls.on(Hls.Events.ERROR, () => finish(null));
+        try {
+          hls.loadSource(m3u8Url);
+        } catch {
+          finish(null);
+        }
+      });
+    };
+
+    const fast = await tryFastManifest();
+    if (fast) {
+      cache.set(m3u8Url, { ...fast, ts: Date.now() });
+      return fast;
+    }
+
+    // 非iPad设备使用优化后的测速逻辑（回退：挂载video并监测一个分片）
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
       video.muted = true;
@@ -250,7 +317,7 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
 
       const hls = new Hls(hlsConfig);
 
-      const timeoutDuration = isMobile ? 3000 : 4000;
+      const timeoutDuration = isMobile ? 2500 : 3500;
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error('Timeout loading video metadata'));
@@ -301,11 +368,13 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
           }
 
           cleanup();
-          resolve({
+          const result = {
             quality,
             loadSpeed: actualLoadSpeed,
             pingTime: Math.round(pingTime),
-          });
+          };
+          cache.set(m3u8Url, { ...result, ts: Date.now() });
+          resolve(result);
         }
       };
 
@@ -358,7 +427,10 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
 
         if (data.fatal) {
           cleanup();
-          reject(new Error(`HLS Error: ${data.type} - ${data.details}`));
+          // 返回一个快速失败的估计而不是抛错，避免整个优选等待过久
+          const fallback = { quality: '未知', loadSpeed: '未知', pingTime: Math.round(pingTime) };
+          cache.set(m3u8Url, { ...fallback, ts: Date.now() });
+          resolve(fallback);
         }
       });
 
@@ -372,7 +444,10 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<{
       }
     });
   } catch (error) {
-    throw new Error(`测速失败: ${error}`);
+    // 快速失败返回占位数据，避免阻塞
+    const fallback = { quality: '未知', loadSpeed: '未知', pingTime: 9999 };
+    cache.set(m3u8Url, { ...fallback, ts: Date.now() });
+    return fallback;
   }
 }
 
