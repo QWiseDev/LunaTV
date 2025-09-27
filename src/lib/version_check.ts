@@ -11,30 +11,84 @@ export enum UpdateStatus {
   FETCH_FAILED = 'fetch_failed', // 获取失败
 }
 
-// 远程版本检查URL配置
-const VERSION_CHECK_URLS = [
-  'https://raw.githubusercontent.com/SzeMeng76/LunaTV/refs/heads/main/VERSION.txt',
-];
+// 从运行时配置解析版本检查地址
+function parseRuntimeVersionUrls(): string[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  type RuntimeConfig = {
+    VERSION_CHECK_URLS?: string[] | string | null;
+  };
+
+  const runtimeConfig = (window as Window & { RUNTIME_CONFIG?: RuntimeConfig })
+    .RUNTIME_CONFIG;
+  const runtimeValue = runtimeConfig?.VERSION_CHECK_URLS ?? null;
+
+  if (!runtimeValue) {
+    return [];
+  }
+
+  if (Array.isArray(runtimeValue)) {
+    return runtimeValue
+      .map((url) => (typeof url === 'string' ? url.trim() : ''))
+      .filter(Boolean);
+  }
+
+  if (typeof runtimeValue === 'string') {
+    return runtimeValue
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+// 从环境变量解析版本检查地址
+function parseEnvVersionUrls(): string[] {
+  const envValue = process.env.NEXT_PUBLIC_VERSION_CHECK_URLS;
+  if (!envValue) {
+    return [];
+  }
+
+  return envValue
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean);
+}
+
+// 汇总所有版本检查地址
+function getVersionCheckUrls(): string[] {
+  const merged = new Set<string>();
+
+  parseEnvVersionUrls().forEach((url) => merged.add(url));
+  parseRuntimeVersionUrls().forEach((url) => merged.add(url));
+
+  return Array.from(merged);
+}
 
 /**
  * 检查是否有新版本可用
  * @returns Promise<UpdateStatus> - 返回版本检查状态
  */
 export async function checkForUpdates(): Promise<UpdateStatus> {
+  const versionCheckUrls = getVersionCheckUrls();
+
+  if (versionCheckUrls.length === 0) {
+    console.info('未配置版本检查 URL，跳过远程版本检查');
+    return UpdateStatus.FETCH_FAILED;
+  }
+
   try {
-    // 尝试从主要URL获取版本信息
-    const primaryVersion = await fetchVersionFromUrl(VERSION_CHECK_URLS[0]);
-    if (primaryVersion) {
-      return compareVersions(primaryVersion);
+    for (const url of versionCheckUrls) {
+      const remoteVersion = await fetchVersionFromUrl(url);
+      if (remoteVersion) {
+        return compareVersions(remoteVersion);
+      }
     }
 
-    // 如果主要URL失败，尝试备用URL
-    const backupVersion = await fetchVersionFromUrl(VERSION_CHECK_URLS[1]);
-    if (backupVersion) {
-      return compareVersions(backupVersion);
-    }
-
-    // 如果两个URL都失败，返回获取失败状态
+    // 如果所有 URL 都无法获取版本信息，返回获取失败状态
     return UpdateStatus.FETCH_FAILED;
   } catch (error) {
     console.error('版本检查失败:', error);

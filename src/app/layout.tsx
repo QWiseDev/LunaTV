@@ -79,6 +79,12 @@ export default async function RootLayout({
     fluidSearch = config.SiteConfig.FluidSearch;
   }
 
+  // 解析版本检查地址（用于客户端自定义更新检查来源）
+  const versionCheckEnv = process.env.NEXT_PUBLIC_VERSION_CHECK_URLS;
+  const versionCheckUrls = versionCheckEnv
+    ? versionCheckEnv.split(',').map((url) => url.trim()).filter(Boolean)
+    : [];
+
   // 将运行时配置注入到全局 window 对象，供客户端在运行时读取
   const runtimeConfig = {
     STORAGE_TYPE: process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage',
@@ -89,6 +95,7 @@ export default async function RootLayout({
     DISABLE_YELLOW_FILTER: disableYellowFilter,
     CUSTOM_CATEGORIES: customCategories,
     FLUID_SEARCH: fluidSearch,
+    VERSION_CHECK_URLS: versionCheckUrls,
   };
 
   return (
