@@ -99,19 +99,28 @@ export class UpstashRedisStorage implements IStorage {
     if (keys.length === 0) return {};
 
     const result: Record<string, PlayRecord> = {};
-    for (const fullKey of keys) {
-      const value = await withRetry(() => this.client.get(fullKey));
+    const values = await withRetry(() => this.client.mget(keys));
+
+    keys.forEach((fullKey, index) => {
+      const value = values[index];
       if (value) {
-        // 截取 source+id 部分
         const keyPart = ensureString(fullKey.replace(`u:${userName}:pr:`, ''));
         result[keyPart] = value as PlayRecord;
       }
-    }
+    });
     return result;
   }
 
   async deletePlayRecord(userName: string, key: string): Promise<void> {
     await withRetry(() => this.client.del(this.prKey(userName, key)));
+  }
+
+  async clearAllPlayRecords(userName: string): Promise<void> {
+    const pattern = `u:${userName}:pr:*`;
+    const keys: string[] = await withRetry(() => this.client.keys(pattern));
+    if (keys.length > 0) {
+      await withRetry(() => this.client.del(keys));
+    }
   }
 
   // ---------- 收藏 ----------
@@ -142,18 +151,28 @@ export class UpstashRedisStorage implements IStorage {
     if (keys.length === 0) return {};
 
     const result: Record<string, Favorite> = {};
-    for (const fullKey of keys) {
-      const value = await withRetry(() => this.client.get(fullKey));
+    const values = await withRetry(() => this.client.mget(keys));
+
+    keys.forEach((fullKey, index) => {
+      const value = values[index];
       if (value) {
         const keyPart = ensureString(fullKey.replace(`u:${userName}:fav:`, ''));
         result[keyPart] = value as Favorite;
       }
-    }
+    });
     return result;
   }
 
   async deleteFavorite(userName: string, key: string): Promise<void> {
     await withRetry(() => this.client.del(this.favKey(userName, key)));
+  }
+
+  async clearAllFavorites(userName: string): Promise<void> {
+    const pattern = `u:${userName}:fav:*`;
+    const keys: string[] = await withRetry(() => this.client.keys(pattern));
+    if (keys.length > 0) {
+      await withRetry(() => this.client.del(keys));
+    }
   }
 
   // ---------- 用户注册 / 登录 ----------
@@ -428,6 +447,72 @@ export class UpstashRedisStorage implements IStorage {
     }
   }
 
+  private buildUserPlayStat(
+    userName: string,
+    playRecords: PlayRecord[]
+  ): UserPlayStat {
+    if (playRecords.length === 0) {
+      const now = Date.now();
+      return {
+        username: userName,
+        totalWatchTime: 0,
+        totalPlays: 0,
+        lastPlayTime: 0,
+        recentRecords: [],
+        avgWatchTime: 0,
+        mostWatchedSource: '',
+        totalMovies: 0,
+        firstWatchDate: now,
+        lastUpdateTime: now,
+      };
+    }
+
+    let totalWatchTime = 0;
+    let lastPlayTime = 0;
+    const sourceCount: Record<string, number> = {};
+
+    playRecords.forEach((record) => {
+      totalWatchTime += record.play_time || 0;
+      if (record.save_time > lastPlayTime) {
+        lastPlayTime = record.save_time;
+      }
+      const sourceName = record.source_name || '未知来源';
+      sourceCount[sourceName] = (sourceCount[sourceName] || 0) + 1;
+    });
+
+    const totalMovies = new Set(
+      playRecords.map((record) => `${record.title}_${record.source_name}_${record.year}`)
+    ).size;
+    const firstWatchDate = Math.min(
+      ...playRecords.map((record) => record.save_time || Date.now())
+    );
+    const recentRecords = [...playRecords]
+      .sort((a, b) => (b.save_time || 0) - (a.save_time || 0))
+      .slice(0, 10);
+
+    let mostWatchedSource = '';
+    let maxCount = 0;
+    for (const [source, count] of Object.entries(sourceCount)) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostWatchedSource = source;
+      }
+    }
+
+    return {
+      username: userName,
+      totalWatchTime,
+      totalPlays: playRecords.length,
+      lastPlayTime,
+      recentRecords,
+      avgWatchTime: playRecords.length > 0 ? totalWatchTime / playRecords.length : 0,
+      mostWatchedSource,
+      totalMovies,
+      firstWatchDate,
+      lastUpdateTime: Date.now(),
+    };
+  }
+
   // ---------- 播放统计相关 ----------
   async getPlayStats(): Promise<PlayStatsResult> {
     try {
@@ -455,6 +540,7 @@ export class UpstashRedisStorage implements IStorage {
       let totalPlays = 0;
       const sourceCount: Record<string, number> = {};
       const dailyData: Record<string, { watchTime: number; plays: number }> = {};
+      const userRecordsCache: Record<string, Record<string, PlayRecord>> = {};
 
       // 用户注册统计
       const now = Date.now();
@@ -466,7 +552,10 @@ export class UpstashRedisStorage implements IStorage {
       const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
       for (const username of allUsers) {
-        const userStat = await this.getUserPlayStat(username);
+        const recordsMap = await this.getAllPlayRecords(username);
+        userRecordsCache[username] = recordsMap;
+        const playRecords = Object.values(recordsMap);
+        const userStat = this.buildUserPlayStat(username, playRecords);
 
         // 设置项目开始时间，2025年9月14日
         const PROJECT_START_DATE = new Date('2025-09-14').getTime();
@@ -506,8 +595,7 @@ export class UpstashRedisStorage implements IStorage {
         totalPlays += userStat.totalPlays;
 
         // 获取用户的播放记录来统计源和每日数据
-        const records = await this.getAllPlayRecords(username);
-        Object.values(records).forEach((record) => {
+        playRecords.forEach((record) => {
           const sourceName = record.source_name || '未知来源';
           sourceCount[sourceName] = (sourceCount[sourceName] || 0) + 1;
 
@@ -617,89 +705,11 @@ export class UpstashRedisStorage implements IStorage {
 
   async getUserPlayStat(userName: string): Promise<UserPlayStat> {
     try {
-      // 获取用户的所有播放记录
       const records = await this.getAllPlayRecords(userName);
-      const playRecords = Object.values(records);
-
-      if (playRecords.length === 0) {
-        return {
-          username: userName,
-          totalWatchTime: 0,
-          totalPlays: 0,
-          lastPlayTime: 0,
-          recentRecords: [],
-          avgWatchTime: 0,
-          mostWatchedSource: '',
-          // 新增字段
-          totalMovies: 0,
-          firstWatchDate: Date.now(),
-          lastUpdateTime: Date.now()
-        };
-      }
-
-      // 计算统计
-      let totalWatchTime = 0;
-      let lastPlayTime = 0;
-      const sourceCount: Record<string, number> = {};
-
-      playRecords.forEach((record) => {
-        totalWatchTime += record.play_time || 0;
-        if (record.save_time > lastPlayTime) {
-          lastPlayTime = record.save_time;
-        }
-        const sourceName = record.source_name || '未知来源';
-        sourceCount[sourceName] = (sourceCount[sourceName] || 0) + 1;
-      });
-
-      // 计算观看影片总数（去重）
-      const totalMovies = new Set(playRecords.map(r => `${r.title}_${r.source_name}_${r.year}`)).size;
-
-      // 计算首次观看时间
-      const firstWatchDate = Math.min(...playRecords.map(r => r.save_time || Date.now()));
-
-      // 获取最近播放记录
-      const recentRecords = playRecords
-        .sort((a, b) => (b.save_time || 0) - (a.save_time || 0))
-        .slice(0, 10);
-
-      // 找出最常观看的来源
-      let mostWatchedSource = '';
-      let maxCount = 0;
-      for (const [source, count] of Object.entries(sourceCount)) {
-        if (count > maxCount) {
-          maxCount = count;
-          mostWatchedSource = source;
-        }
-      }
-
-      return {
-        username: userName,
-        totalWatchTime,
-        totalPlays: playRecords.length,
-        lastPlayTime,
-        recentRecords,
-        avgWatchTime: playRecords.length > 0 ? totalWatchTime / playRecords.length : 0,
-        mostWatchedSource,
-        // 新增字段
-        totalMovies,
-        firstWatchDate,
-        lastUpdateTime: Date.now()
-      };
+      return this.buildUserPlayStat(userName, Object.values(records));
     } catch (error) {
       console.error(`获取用户 ${userName} 统计失败:`, error);
-      return {
-        username: userName,
-        totalWatchTime: 0,
-        totalPlays: 0,
-        lastPlayTime: 0,
-        recentRecords: [],
-        avgWatchTime: 0,
-        mostWatchedSource: '',
-        // 新增字段
-        totalMovies: 0,
-        firstWatchDate: Date.now(),
-        lastUpdateTime: Date.now()
-      };
+      return this.buildUserPlayStat(userName, []);
     }
   }
 
@@ -721,7 +731,7 @@ export class UpstashRedisStorage implements IStorage {
       }> = {};
 
       for (const username of allUsers) {
-        const records = await this.getAllPlayRecords(username);
+        const records = userRecordsCache[username] || (await this.getAllPlayRecords(username));
         Object.entries(records).forEach(([key, record]) => {
           if (!contentStats[key]) {
             // 从key中解析source和id

@@ -96,6 +96,22 @@ export class DbManager {
     await this.storage.deletePlayRecord(userName, key);
   }
 
+  async clearAllPlayRecords(userName: string): Promise<void> {
+    if (typeof (this.storage as any).clearAllPlayRecords === 'function') {
+      await (this.storage as any).clearAllPlayRecords(userName);
+      return;
+    }
+
+    const allRecords = await this.getAllPlayRecords(userName);
+    const tasks = Object.keys(allRecords).map((entry) => {
+      const [source, id] = entry.split('+');
+      return source && id
+        ? this.deletePlayRecord(userName, source, id)
+        : Promise.resolve();
+    });
+    await Promise.all(tasks);
+  }
+
   // 收藏相关方法
   async getFavorite(
     userName: string,
@@ -129,6 +145,22 @@ export class DbManager {
   ): Promise<void> {
     const key = generateStorageKey(source, id);
     await this.storage.deleteFavorite(userName, key);
+  }
+
+  async clearAllFavorites(userName: string): Promise<void> {
+    if (typeof (this.storage as any).clearAllFavorites === 'function') {
+      await (this.storage as any).clearAllFavorites(userName);
+      return;
+    }
+
+    const allFavorites = await this.getAllFavorites(userName);
+    const tasks = Object.keys(allFavorites).map((entry) => {
+      const [source, id] = entry.split('+');
+      return source && id
+        ? this.deleteFavorite(userName, source, id)
+        : Promise.resolve();
+    });
+    await Promise.all(tasks);
   }
 
   async isFavorited(

@@ -209,6 +209,14 @@ export abstract class BaseRedisStorage implements IStorage {
     await this.withRetry(() => this.client.del(this.prKey(userName, key)));
   }
 
+  async clearAllPlayRecords(userName: string): Promise<void> {
+    const pattern = `u:${userName}:pr:*`;
+    const keys: string[] = await this.withRetry(() => this.client.keys(pattern));
+    if (keys.length > 0) {
+      await this.withRetry(() => this.client.del(keys));
+    }
+  }
+
   // ---------- 收藏 ----------
   private favKey(user: string, key: string) {
     return `u:${user}:fav:${key}`;
@@ -250,6 +258,14 @@ export abstract class BaseRedisStorage implements IStorage {
 
   async deleteFavorite(userName: string, key: string): Promise<void> {
     await this.withRetry(() => this.client.del(this.favKey(userName, key)));
+  }
+
+  async clearAllFavorites(userName: string): Promise<void> {
+    const pattern = `u:${userName}:fav:*`;
+    const keys: string[] = await this.withRetry(() => this.client.keys(pattern));
+    if (keys.length > 0) {
+      await this.withRetry(() => this.client.del(keys));
+    }
   }
 
   // ---------- 用户注册 / 登录 ----------
