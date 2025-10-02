@@ -42,6 +42,81 @@ html:not(.dark) body {
   background-attachment: fixed;
 }
 
+/* 登录页专用背景，结合 Bing 每日壁纸与渐变 */
+.login-page-background {
+  background-color: #e6f3fb;
+  background-image: url('https://bing.img.run/rand_uhd.php');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-attachment: fixed;
+  isolation: isolate;
+}
+
+.dark .login-page-background {
+  background-color: #020617;
+  background-image: url('https://bing.img.run/rand_uhd.php');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.login-card {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(248, 250, 252, 0.72) 45%,
+    rgba(226, 232, 240, 0.78) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.dark .login-card {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.82) 0%,
+    rgba(30, 41, 59, 0.76) 45%,
+    rgba(15, 23, 42, 0.88) 100%
+  );
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 30px 60px -15px rgba(15, 23, 42, 0.6);
+}
+
+@media (max-width: 768px) {
+  .login-page-background {
+    background-image: url('https://bing.img.run/rand_m.php');
+    background-position: center top;
+  }
+
+  .dark .login-page-background {
+    background-image: url('https://bing.img.run/rand_m.php');
+    background-position: center top;
+  }
+
+  .login-card {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.84) 0%,
+      rgba(248, 250, 252, 0.74) 45%,
+      rgba(226, 232, 240, 0.8) 100%
+    );
+  }
+
+  .dark .login-card {
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.85) 0%,
+      rgba(30, 41, 59, 0.78) 45%,
+      rgba(15, 23, 42, 0.9) 100%
+    );
+  }
+}
+
 /* 自定义滚动条样式 */
 ::-webkit-scrollbar {
   width: 8px;
@@ -291,7 +366,7 @@ div[data-media-provider] video {
   }
 
   /* 防止进度条拖拽时弹窗干扰 */
-  .artplayer[data-dragging="true"] .artplayer-plugin-danmuku .apd-config-panel {
+  .artplayer[data-dragging='true'] .artplayer-plugin-danmuku .apd-config-panel {
     opacity: 0 !important;
     pointer-events: none !important;
     visibility: hidden !important;

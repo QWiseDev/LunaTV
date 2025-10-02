@@ -14,7 +14,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 function VersionDisplay() {
   return (
     <div
-      className='absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400'
+      className='absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 transition-colors cursor-default select-none'
     >
       <span className='font-mono'>v{CURRENT_VERSION}</span>
     </div>
@@ -58,6 +58,15 @@ function LoginPageClient() {
       });
 
       if (res.ok) {
+        // 记录登入时间（异步，不阻塞跳转）
+        void fetch('/api/user/my-stats', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ loginTime: Date.now() })
+        }).catch((error) => {
+          console.log('记录登入时间失败:', error);
+        });
+
         const redirect = searchParams.get('redirect') || '/';
         router.replace(redirect);
       } else if (res.status === 401) {
@@ -76,11 +85,11 @@ function LoginPageClient() {
 
 
   return (
-    <div className='relative min-h-screen flex items-center justify-center px-4 overflow-hidden'>
+    <div className='login-page-background relative min-h-screen flex items-center justify-center px-4 overflow-hidden'>
       <div className='absolute top-4 right-4'>
         <ThemeToggle />
       </div>
-      <div className='relative z-10 w-full max-w-md rounded-3xl bg-gradient-to-b from-white/90 via-white/70 to-white/40 dark:from-zinc-900/90 dark:via-zinc-900/70 dark:to-zinc-900/40 backdrop-blur-xl shadow-2xl p-10 dark:border dark:border-zinc-800'>
+      <div className='login-card relative z-10 w-full max-w-md rounded-3xl p-10'>
         <h1 className='text-green-600 tracking-tight text-center text-3xl font-extrabold mb-8 bg-clip-text drop-shadow-sm'>
           {siteName}
         </h1>
