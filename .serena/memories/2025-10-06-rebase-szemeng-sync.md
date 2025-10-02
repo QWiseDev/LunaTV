@@ -1,0 +1,1 @@
+2025-10-06 服务器本地执行：從 `szemeng/main` 抓取最新提交，將本地 `main` 透過 rebase 對齊，保留原先 8 個 QWise 增量。rebase 無衝突。嘗試 `git push origin main --force-with-lease` 因網路/權限失敗（連線超時），需要具備憑證的成員手動推送。

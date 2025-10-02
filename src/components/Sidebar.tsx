@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Cat, Clover, Film, Globe, Home, Menu, PlaySquare, Radio, Search, Star, Tv } from 'lucide-react';
+import { Cat, Clover, Film, Globe, Home, Layers, Menu, PlaySquare, Radio, Search, Star, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -13,6 +13,8 @@ import {
   useLayoutEffect,
   useState,
 } from 'react';
+
+import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 
 import { useSite } from './SiteProvider';
 
@@ -165,7 +167,58 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
       label: '直播',
       href: '/live',
     },
+    {
+      icon: Layers,
+      label: '全资源',
+      href: '/source-browser',
+    },
   ]);
+
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const auth = getAuthInfoFromBrowserCookie();
+    const admin = auth?.role === 'owner' || auth?.role === 'admin';
+    setIsAdmin(admin);
+  }, []);
+
+  useEffect(() => {
+    setMenuItems((prevItems) => {
+      const hasSourceTest = prevItems.some((item) => item.href === '/source-test');
+
+      if (isAdmin) {
+        if (hasSourceTest) {
+          return prevItems;
+        }
+
+        const newItems = [...prevItems];
+        const insertIndex = newItems.findIndex((item) => item.href === '/source-browser');
+        const sourceTestItem = {
+          icon: Search,
+          label: '源检测',
+          href: '/source-test',
+        };
+
+        if (insertIndex !== -1) {
+          newItems.splice(insertIndex + 1, 0, sourceTestItem);
+        } else {
+          newItems.push(sourceTestItem);
+        }
+
+        return newItems;
+      }
+
+      if (!hasSourceTest) {
+        return prevItems;
+      }
+
+      return prevItems.filter((item) => item.href !== '/source-test');
+    });
+  }, [isAdmin]);
 
   useEffect(() => {
     const runtimeConfig = (window as any).RUNTIME_CONFIG;
