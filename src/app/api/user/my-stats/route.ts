@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getConfig } from '@/lib/config';
 import { db } from '@/lib/db';
+import { ensureUserAccessOrResponse } from '@/lib/user-access';
 
 // 计算注册天数
 function calculateRegistrationDays(startDate: number): number {
@@ -44,22 +45,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const config = await getConfig();
-    const username = process.env.USERNAME;
-
-    // 检查用户权限（管理员或普通用户）
-    if (authInfo.username !== username) {
-      // 非站长，检查用户存在或被封禁
-      const user = config.UserConfig.Users.find(
-        (u) => u.username === authInfo.username
-      );
-      if (!user) {
-        return NextResponse.json({ error: '用户不存在' }, { status: 401 });
-      }
-      if (user.banned) {
-        return NextResponse.json({ error: '用户已被封禁' }, { status: 401 });
-      }
+    const guardResult = await ensureUserAccessOrResponse(authInfo.username);
+    if ('response' in guardResult) {
+      return guardResult.response;
     }
+    const { config, user: resolvedUser } = guardResult.resolved;
 
     // 获取用户个人统计数据
     const userStats = await db.getUserPlayStat(authInfo.username);
@@ -70,12 +60,8 @@ export async function GET(request: NextRequest) {
     let userCreatedAt = PROJECT_START_DATE;
 
     // 对于所有用户（包括站长），都尝试从配置中获取创建时间
-    const user = config.UserConfig.Users.find(
-      (u) => u.username === authInfo.username
-    );
-
     // 使用与管理员统计相同的逻辑
-    userCreatedAt = user?.createdAt || PROJECT_START_DATE;
+    userCreatedAt = resolvedUser?.createdAt || PROJECT_START_DATE;
 
     // 增强统计数据：添加注册天数和登录天数计算
     const registrationDays = calculateRegistrationDays(userCreatedAt);
@@ -145,20 +131,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const config = await getConfig();
-    const username = process.env.USERNAME;
-
-    // 检查用户权限
-    if (authInfo.username !== username) {
-      const user = config.UserConfig.Users.find(
-        (u) => u.username === authInfo.username
-      );
-      if (!user) {
-        return NextResponse.json({ error: '用户不存在' }, { status: 401 });
-      }
-      if (user.banned) {
-        return NextResponse.json({ error: '用户已被封禁' }, { status: 401 });
-      }
+    const guardResult = await ensureUserAccessOrResponse(authInfo.username);
+    if ('response' in guardResult) {
+      return guardResult.response;
     }
 
     const body = await request.json();
@@ -321,20 +296,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const config = await getConfig();
-    const username = process.env.USERNAME;
-
-    // 检查用户权限
-    if (authInfo.username !== username) {
-      const user = config.UserConfig.Users.find(
-        (u) => u.username === authInfo.username
-      );
-      if (!user) {
-        return NextResponse.json({ error: '用户不存在' }, { status: 401 });
-      }
-      if (user.banned) {
-        return NextResponse.json({ error: '用户已被封禁' }, { status: 401 });
-      }
+    const guardResult = await ensureUserAccessOrResponse(authInfo.username);
+    if ('response' in guardResult) {
+      return guardResult.response;
     }
 
     // TODO: 需要在存储层添加清除用户统计数据的方法
