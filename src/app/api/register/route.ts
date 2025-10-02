@@ -1,6 +1,7 @@
 /* eslint-disable no-console,@typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 
+import type { AdminConfig } from '@/lib/admin.types';
 import { clearConfigCache, getConfig } from '@/lib/config';
 import { db } from '@/lib/db';
 
@@ -14,6 +15,12 @@ const STORAGE_TYPE =
     | 'upstash'
     | 'kvrocks'
     | undefined) || 'localstorage';
+
+const DEFAULT_USER_GROUP =
+  (process.env.NEXT_PUBLIC_DEFAULT_USER_GROUP ||
+    process.env.DEFAULT_USER_GROUP ||
+    '普通用户组')
+    .trim();
 
 // 生成签名
 async function generateSignature(
@@ -137,11 +144,30 @@ export async function POST(req: NextRequest) {
 
       // 重新获取配置来添加用户
       const config = await getConfig();
-      const newUser = {
+      const newUser: AdminConfig['UserConfig']['Users'][number] = {
         username: username,
         role: 'user' as const,
         createdAt: Date.now(), // 设置注册时间戳
       };
+
+      if (DEFAULT_USER_GROUP) {
+        if (!config.UserConfig.Tags) {
+          config.UserConfig.Tags = [];
+        }
+
+        const defaultGroupExists = config.UserConfig.Tags.some(
+          (tag) => tag.name === DEFAULT_USER_GROUP
+        );
+
+        if (!defaultGroupExists) {
+          config.UserConfig.Tags.push({
+            name: DEFAULT_USER_GROUP,
+            enabledApis: [],
+          });
+        }
+
+        newUser.tags = [DEFAULT_USER_GROUP];
+      }
 
       config.UserConfig.Users.push(newUser);
 
