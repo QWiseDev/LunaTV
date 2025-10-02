@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Box, Cat, Clover, Film, Home, PlaySquare, Radio, Star, Tv } from 'lucide-react';
+import { Cat, Clover, Film, Home, Layers, PlaySquare, Radio, Star, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -51,6 +51,11 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       icon: Radio,
       label: '直播',
       href: '/live',
+    },
+    {
+      icon: Layers,
+      label: '全资源',
+      href: '/source-browser',
     },
   ]);
 
