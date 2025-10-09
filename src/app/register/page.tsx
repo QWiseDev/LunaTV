@@ -2,7 +2,14 @@
 
 'use client';
 
-import { AlertCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle,
+  Lock,
+  Shield,
+  User,
+  UserPlus,
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 

@@ -30,7 +30,6 @@ import {
   ChevronDown,
   ChevronUp,
   Database,
-  ExternalLink,
   FileText,
   FolderOpen,
   Settings,
@@ -3778,16 +3777,10 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
   const getThanksInfo = (dataSource: string) => {
     switch (dataSource) {
       case 'cors-proxy-zwei':
-        return {
-          text: 'Thanks to @Zwei',
-          url: 'https://github.com/bestzwei',
-        };
+        return '感谢 @Zwei 提供豆瓣代理服务';
       case 'cmliussss-cdn-tencent':
       case 'cmliussss-cdn-ali':
-        return {
-          text: 'Thanks to @CMLiussss',
-          url: 'https://github.com/cmliu',
-        };
+        return '感谢 @CMLiussss 提供豆瓣 CDN 支持';
       default:
         return null;
     }
@@ -3995,22 +3988,10 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
 
           {/* 感谢信息 */}
           {getThanksInfo(siteSettings.DoubanProxyType) && (
-            <div className='mt-3'>
-              <button
-                type='button'
-                onClick={() =>
-                  window.open(
-                    getThanksInfo(siteSettings.DoubanProxyType)!.url,
-                    '_blank'
-                  )
-                }
-                className='flex items-center justify-center gap-1.5 w-full px-3 text-xs text-gray-500 dark:text-gray-400 cursor-pointer'
-              >
-                <span className='font-medium'>
-                  {getThanksInfo(siteSettings.DoubanProxyType)!.text}
-                </span>
-                <ExternalLink className='w-3.5 opacity-70' />
-              </button>
+            <div className='mt-3 flex items-center justify-center px-3 text-xs text-gray-500 dark:text-gray-400'>
+              <span className='font-medium'>
+                {getThanksInfo(siteSettings.DoubanProxyType)}
+              </span>
             </div>
           )}
         </div>
@@ -4107,22 +4088,10 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
 
           {/* 感谢信息 */}
           {getThanksInfo(siteSettings.DoubanImageProxyType) && (
-            <div className='mt-3'>
-              <button
-                type='button'
-                onClick={() =>
-                  window.open(
-                    getThanksInfo(siteSettings.DoubanImageProxyType)!.url,
-                    '_blank'
-                  )
-                }
-                className='flex items-center justify-center gap-1.5 w-full px-3 text-xs text-gray-500 dark:text-gray-400 cursor-pointer'
-              >
-                <span className='font-medium'>
-                  {getThanksInfo(siteSettings.DoubanImageProxyType)!.text}
-                </span>
-                <ExternalLink className='w-3.5 opacity-70' />
-              </button>
+            <div className='mt-3 flex items-center justify-center px-3 text-xs text-gray-500 dark:text-gray-400'>
+              <span className='font-medium'>
+                {getThanksInfo(siteSettings.DoubanImageProxyType)}
+              </span>
             </div>
           )}
         </div>
@@ -5017,14 +4986,7 @@ const NetDiskConfig = ({
               <path fillRule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' clipRule='evenodd' />
             </svg>
             <span>📡 集成开源项目 <strong>PanSou</strong> 提供网盘资源搜索功能</span>
-            <a 
-              href='https://github.com/fish2018/pansou' 
-              target='_blank' 
-              rel='noopener noreferrer'
-              className='text-blue-700 dark:text-blue-300 hover:underline font-medium'
-            >
-              查看项目
-            </a>
+            <span className='text-blue-700 dark:text-blue-300 font-medium'>更多信息请联系管理员</span>
           </div>
         </div>
         
@@ -5058,17 +5020,9 @@ const NetDiskConfig = ({
               <div className='flex-1'>
                 默认使用公益服务，您也可以填入自己搭建的PanSou服务地址
               </div>
-              <a
-                href='https://github.com/fish2018/pansou'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md transition-colors whitespace-nowrap'
-              >
-                <svg className='h-3 w-3 mr-1' fill='currentColor' viewBox='0 0 20 20'>
-                  <path fillRule='evenodd' d='M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z' clipRule='evenodd' />
-                </svg>
-                搭建教程
-              </a>
+              <span className='inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md whitespace-nowrap'>
+                搭建教程请联系管理员获取
+              </span>
             </div>
           </div>
 

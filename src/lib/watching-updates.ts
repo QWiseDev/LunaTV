@@ -94,10 +94,10 @@ export async function checkWatchingUpdates(forceRefresh = false): Promise<void> 
 
     // 🔧 优化：立即清除缓存并强制从服务器获取最新播放记录
     console.log('🔄 强制从服务器获取最新播放记录以确保数据同步...');
-    forceRefreshPlayRecordsCache(true);
+    forceRefreshPlayRecordsCache();
 
     // 获取用户的播放记录（强制刷新）
-    const recordsObj = await getAllPlayRecords(true);
+    const recordsObj = await getAllPlayRecords();
     const records = Object.entries(recordsObj).map(([key, record]) => ({
       ...record,
       id: key

@@ -2,6 +2,7 @@
 
 'use client';
 
+import { AlertCircle, Lock, Sparkles, User, UserPlus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
