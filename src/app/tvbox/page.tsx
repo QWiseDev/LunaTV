@@ -194,21 +194,6 @@ export default function TVBoxConfigPage() {
     'checking',
   );
 
-  // 智能健康检查状态
-  const [smartHealthResult, setSmartHealthResult] = useState<SmartHealthResult | null>(null);
-  const [smartHealthLoading, setSmartHealthLoading] = useState(false);
-
-  // JAR源修复状态
-  const [jarFixResult, setJarFixResult] = useState<JarFixResult | null>(null);
-  const [jarFixLoading, setJarFixLoading] = useState(false);
-
-  // 深度诊断状态
-  const [deepDiagnosticResult, setDeepDiagnosticResult] = useState<any>(null);
-  const [deepDiagnosticLoading, setDeepDiagnosticLoading] = useState(false);
-
-  // Tab状态
-  const [activeTab, setActiveTab] = useState<'basic' | 'smart-health' | 'jar-fix' | 'deep-diagnostic'>('basic');
-
   // 获取安全配置（使用普通用户可访问的接口）
   const fetchSecurityConfig = useCallback(async () => {
     try {
