@@ -58,6 +58,14 @@ function PlayPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<SearchResult | null>(null);
 
+  // 测速进度状态
+  const [speedTestProgress, setSpeedTestProgress] = useState<{
+    current: number;
+    total: number;
+    currentSource: string;
+    result?: string;
+  } | null>(null);
+
   // 收藏状态
   const [favorited, setFavorited] = useState(false);
 
@@ -728,8 +736,15 @@ function PlayPageClient() {
     console.log(`开始轻量级测速: 共${sources.length}个源，将测试前${sourcesToTest.length}个`);
 
     const results = await Promise.all(
-      sourcesToTest.map(async (source) => {
+      sourcesToTest.map(async (source, index) => {
         try {
+          // 更新进度：显示当前正在测试的源
+          setSpeedTestProgress({
+            current: index + 1,
+            total: sourcesToTest.length,
+            currentSource: source.source_name,
+          });
+
           if (!source.episodes || source.episodes.length === 0) {
             return { source, pingTime: 9999, available: false };
           }
@@ -747,6 +762,14 @@ function PlayPageClient() {
           });
           const pingTime = performance.now() - startTime;
 
+          // 更新进度：显示测试结果
+          setSpeedTestProgress({
+            current: index + 1,
+            total: sourcesToTest.length,
+            currentSource: source.source_name,
+            result: `${Math.round(pingTime)}ms`,
+          });
+
           return {
             source,
             pingTime: Math.round(pingTime),
@@ -754,6 +777,15 @@ function PlayPageClient() {
           };
         } catch (error) {
           console.warn(`轻量级测速失败: ${source.source_name}`, error);
+
+          // 更新进度：显示失败
+          setSpeedTestProgress({
+            current: index + 1,
+            total: sourcesToTest.length,
+            currentSource: source.source_name,
+            result: '连接失败',
+          });
+
           return { source, pingTime: 9999, available: false };
         }
       })
@@ -772,6 +804,9 @@ function PlayPageClient() {
     console.log('轻量级优选结果:', sortedResults.map(r =>
       `${r.source.source_name}: ${r.pingTime}ms`
     ));
+
+    // 清除测速进度状态
+    setSpeedTestProgress(null);
 
     return sortedResults[0].source;
   };
@@ -792,14 +827,23 @@ function PlayPageClient() {
     } | null> = [];
 
     let shouldStop = false; // 早停标志
+    let testedCount = 0; // 已测试数量
 
     for (let i = 0; i < sourcesToTest.length && !shouldStop; i += concurrency) {
       const batch = sourcesToTest.slice(i, i + concurrency);
       console.log(`测速批次 ${Math.floor(i/concurrency) + 1}/${Math.ceil(sourcesToTest.length/concurrency)}: ${batch.length} 个源`);
 
       const batchResults = await Promise.all(
-        batch.map(async (source) => {
+        batch.map(async (source, batchIndex) => {
           try {
+            // 更新进度：显示当前正在测试的源
+            const currentIndex = i + batchIndex + 1;
+            setSpeedTestProgress({
+              current: currentIndex,
+              total: sourcesToTest.length,
+              currentSource: source.source_name,
+            });
+
             if (!source.episodes || source.episodes.length === 0) {
               return null;
             }
@@ -809,15 +853,35 @@ function PlayPageClient() {
               : source.episodes[0];
 
             const testResult = await getVideoResolutionFromM3u8(episodeUrl);
+
+            // 更新进度：显示测试结果
+            setSpeedTestProgress({
+              current: currentIndex,
+              total: sourcesToTest.length,
+              currentSource: source.source_name,
+              result: `${testResult.quality} | ${testResult.loadSpeed} | ${testResult.pingTime}ms`,
+            });
+
             return { source, testResult };
           } catch (error) {
             console.warn(`测速失败: ${source.source_name}`, error);
+
+            // 更新进度：显示失败
+            const currentIndex = i + batchIndex + 1;
+            setSpeedTestProgress({
+              current: currentIndex,
+              total: sourcesToTest.length,
+              currentSource: source.source_name,
+              result: '测速失败',
+            });
+
             return null;
           }
         })
       );
 
       allResults.push(...batchResults);
+      testedCount += batch.length;
 
       // 早停检查：如果找到了优质源（4K或2K + 速度>5MB/s，或1080p + 速度>5MB/s），立即停止
       const successfulInBatch = batchResults.filter(Boolean) as Array<{
@@ -928,6 +992,9 @@ function PlayPageClient() {
         }, ${result.testResult.pingTime}ms)`
       );
     });
+
+    // 清除测速进度状态
+    setSpeedTestProgress(null);
 
     return resultsWithScore[0].source;
   };
@@ -3989,10 +4056,29 @@ function PlayPageClient() {
             </div>
 
             {/* 加载消息 */}
-            <div className='space-y-2'>
+            <div className='space-y-3'>
               <p className='text-xl font-semibold text-gray-800 dark:text-gray-200 animate-pulse'>
                 {loadingMessage}
               </p>
+
+              {/* 测速进度显示 */}
+              {speedTestProgress && (
+                <div className='mt-4 space-y-2'>
+                  <div className='flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                    <span className='font-medium'>
+                      [{speedTestProgress.current}/{speedTestProgress.total}]
+                    </span>
+                    <span className='text-green-600 dark:text-green-400'>
+                      {speedTestProgress.currentSource}
+                    </span>
+                  </div>
+                  {speedTestProgress.result && (
+                    <div className='text-xs text-gray-500 dark:text-gray-500 font-mono'>
+                      {speedTestProgress.result}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
