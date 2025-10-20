@@ -2,15 +2,11 @@
 
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { Heart, ChevronUp } from 'lucide-react';
+import { ChevronUp,Heart } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
 
-import EpisodeSelector from '@/components/EpisodeSelector';
-import NetDiskSearchResults from '@/components/NetDiskSearchResults';
-import PageLayout from '@/components/PageLayout';
-import SkipController, { SkipSettingsButton } from '@/components/SkipController';
 import artplayerPluginChromecast from '@/lib/artplayer-plugin-chromecast';
 import { ClientCache } from '@/lib/client-cache';
 import {
@@ -26,6 +22,11 @@ import {
 import { getDoubanDetails } from '@/lib/douban.client';
 import { SearchResult } from '@/lib/types';
 import { getVideoResolutionFromM3u8, processImageUrl } from '@/lib/utils';
+
+import EpisodeSelector from '@/components/EpisodeSelector';
+import NetDiskSearchResults from '@/components/NetDiskSearchResults';
+import PageLayout from '@/components/PageLayout';
+import SkipController from '@/components/SkipController';
 
 // 扩展 HTMLVideoElement 类型以支持 hls 属性
 declare global {
@@ -190,7 +191,7 @@ function PlayPageClient() {
         if (loadingBangumiDetails || bangumiDetails) {
           return;
         }
-        
+
         setLoadingBangumiDetails(true);
         try {
           const bangumiData = await fetchBangumiDetails(videoDoubanId);
@@ -207,7 +208,7 @@ function PlayPageClient() {
         if (loadingMovieDetails || movieDetails) {
           return;
         }
-        
+
         setLoadingMovieDetails(true);
         try {
           const response = await getDoubanDetails(videoDoubanId.toString());
@@ -223,7 +224,9 @@ function PlayPageClient() {
     };
 
     loadMovieDetails();
-  }, [videoDoubanId, loadingMovieDetails, movieDetails, loadingBangumiDetails, bangumiDetails]);
+    // 只依赖 videoDoubanId 和 detail，避免因 loading 状态变化导致重复执行
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoDoubanId, detail?.source]);
 
   // 自动网盘搜索：当有视频标题时可以随时搜索
   useEffect(() => {
@@ -718,32 +721,36 @@ function PlayPageClient() {
 
   // 轻量级优选：仅测试连通性，不创建video和HLS
   const lightweightPreference = async (sources: SearchResult[]): Promise<SearchResult> => {
-    console.log('开始轻量级测速，仅测试连通性');
-    
+    // 限制最大测试数量，避免站点过多时等待时间过长
+    const maxTestCount = 8;
+    const sourcesToTest = sources.slice(0, maxTestCount);
+
+    console.log(`开始轻量级测速: 共${sources.length}个源，将测试前${sourcesToTest.length}个`);
+
     const results = await Promise.all(
-      sources.map(async (source) => {
+      sourcesToTest.map(async (source) => {
         try {
           if (!source.episodes || source.episodes.length === 0) {
             return { source, pingTime: 9999, available: false };
           }
 
-          const episodeUrl = source.episodes.length > 1 
-            ? source.episodes[1] 
+          const episodeUrl = source.episodes.length > 1
+            ? source.episodes[1]
             : source.episodes[0];
-          
-          // 仅测试连通性和响应时间
+
+          // 仅测试连通性和响应时间（缩短超时时间）
           const startTime = performance.now();
-          await fetch(episodeUrl, { 
-            method: 'HEAD', 
+          await fetch(episodeUrl, {
+            method: 'HEAD',
             mode: 'no-cors',
-            signal: AbortSignal.timeout(3000) // 3秒超时
+            signal: AbortSignal.timeout(2000) // 2秒超时（从3秒减少）
           });
           const pingTime = performance.now() - startTime;
-          
-          return { 
-            source, 
-            pingTime: Math.round(pingTime), 
-            available: true 
+
+          return {
+            source,
+            pingTime: Math.round(pingTime),
+            available: true
           };
         } catch (error) {
           console.warn(`轻量级测速失败: ${source.source_name}`, error);
@@ -762,10 +769,10 @@ function PlayPageClient() {
       return sources[0];
     }
 
-    console.log('轻量级优选结果:', sortedResults.map(r => 
+    console.log('轻量级优选结果:', sortedResults.map(r =>
       `${r.source.source_name}: ${r.pingTime}ms`
     ));
-    
+
     return sortedResults[0].source;
   };
 
@@ -773,15 +780,23 @@ function PlayPageClient() {
   const fullSpeedTest = async (sources: SearchResult[]): Promise<SearchResult> => {
     // 桌面设备使用小批量并发，避免创建过多实例
     const concurrency = 2;
+    // 限制最大测试数量，避免站点过多时等待时间过长
+    const maxTestCount = 10;
+    const sourcesToTest = sources.slice(0, maxTestCount);
+
+    console.log(`开始测速: 共${sources.length}个源，将测试前${sourcesToTest.length}个`);
+
     const allResults: Array<{
       source: SearchResult;
       testResult: { quality: string; loadSpeed: string; pingTime: number };
     } | null> = [];
 
-    for (let i = 0; i < sources.length; i += concurrency) {
-      const batch = sources.slice(i, i + concurrency);
-      console.log(`测速批次 ${Math.floor(i/concurrency) + 1}/${Math.ceil(sources.length/concurrency)}: ${batch.length} 个源`);
-      
+    let shouldStop = false; // 早停标志
+
+    for (let i = 0; i < sourcesToTest.length && !shouldStop; i += concurrency) {
+      const batch = sourcesToTest.slice(i, i + concurrency);
+      console.log(`测速批次 ${Math.floor(i/concurrency) + 1}/${Math.ceil(sourcesToTest.length/concurrency)}: ${batch.length} 个源`);
+
       const batchResults = await Promise.all(
         batch.map(async (source) => {
           try {
@@ -792,7 +807,7 @@ function PlayPageClient() {
             const episodeUrl = source.episodes.length > 1
               ? source.episodes[1]
               : source.episodes[0];
-            
+
             const testResult = await getVideoResolutionFromM3u8(episodeUrl);
             return { source, testResult };
           } catch (error) {
@@ -801,12 +816,34 @@ function PlayPageClient() {
           }
         })
       );
-      
+
       allResults.push(...batchResults);
-      
-      // 批次间延迟，让资源有时间清理
-      if (i + concurrency < sources.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 早停检查：如果找到了优质源（4K或2K + 速度>5MB/s，或1080p + 速度>5MB/s），立即停止
+      const successfulInBatch = batchResults.filter(Boolean) as Array<{
+        source: SearchResult;
+        testResult: { quality: string; loadSpeed: string; pingTime: number };
+      }>;
+
+      for (const result of successfulInBatch) {
+        const { quality, loadSpeed } = result.testResult;
+        const speedMatch = loadSpeed.match(/^([\d.]+)\s*MB\/s$/);
+        const speedMBps = speedMatch ? parseFloat(speedMatch[1]) : 0;
+
+        // 优质源判断条件
+        const isHighQuality = (quality === '4K' || quality === '2K') && speedMBps >= 5;
+        const isGoodQuality = quality === '1080p' && speedMBps >= 5;
+
+        if (isHighQuality || isGoodQuality) {
+          console.log(`✓ 找到优质源: ${result.source.source_name} (${quality}, ${loadSpeed})，停止测速`);
+          shouldStop = true;
+          break;
+        }
+      }
+
+      // 批次间延迟，让资源有时间清理（减少延迟时间）
+      if (i + concurrency < sourcesToTest.length && !shouldStop) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
 
@@ -1584,13 +1621,16 @@ function PlayPageClient() {
       try {
         console.log('开始智能搜索，原始查询:', query);
         const searchVariants = generateSearchVariants(query.trim());
-        console.log('生成的搜索变体:', searchVariants);
-        
+        // 限制最大搜索变体数量，避免过多 API 调用
+        const maxVariants = 3;
+        const limitedVariants = searchVariants.slice(0, maxVariants);
+        console.log(`生成的搜索变体: ${searchVariants.length}个，将使用前${limitedVariants.length}个`);
+
         const allResults: SearchResult[] = [];
         let bestResults: SearchResult[] = [];
-        
+
         // 依次尝试每个搜索变体，采用早期退出策略
-        for (const variant of searchVariants) {
+        for (const variant of limitedVariants) {
           console.log('尝试搜索变体:', variant);
 
           const response = await fetch(
@@ -1636,7 +1676,12 @@ function PlayPageClient() {
             if (filteredResults.length > 0) {
               console.log(`变体 "${variant}" 找到 ${filteredResults.length} 个精确匹配结果`);
               bestResults = filteredResults;
-              break; // 找到精确匹配就停止
+              // 如果找到足够多的精确匹配结果（≥5个），立即停止搜索
+              if (filteredResults.length >= 5) {
+                console.log('✓ 已找到足够多的精确匹配结果，停止搜索');
+                break;
+              }
+              // 否则继续尝试下一个变体，可能找到更多结果
             }
           }
         }

@@ -57,11 +57,6 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       label: '直播',
       href: '/live',
     },
-    {
-      icon: Layers,
-      label: '全资源',
-      href: '/source-browser',
-    },
   ]);
 
   useEffect(() => {

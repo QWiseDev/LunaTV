@@ -167,11 +167,6 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
       label: '直播',
       href: '/live',
     },
-    {
-      icon: Layers,
-      label: '全资源',
-      href: '/source-browser',
-    },
   ]);
 
   const [isAdmin, setIsAdmin] = useState(false);
