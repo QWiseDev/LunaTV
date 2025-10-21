@@ -23,21 +23,21 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
+import {
+  type PlayRecord,
+  forceRefreshPlayRecordsCache,
+  getAllPlayRecords,
+} from '@/lib/db.client';
+import type { Favorite } from '@/lib/types';
 import { CURRENT_VERSION } from '@/lib/version';
 import { checkForUpdates, UpdateStatus } from '@/lib/version_check';
 import {
+  type WatchingUpdate,
+  checkWatchingUpdates,
   getCachedWatchingUpdates,
   getDetailedWatchingUpdates,
   subscribeToWatchingUpdatesEvent,
-  checkWatchingUpdates,
-  type WatchingUpdate,
 } from '@/lib/watching-updates';
-import {
-  getAllPlayRecords,
-  forceRefreshPlayRecordsCache,
-  type PlayRecord,
-} from '@/lib/db.client';
-import type { Favorite } from '@/lib/types';
 
 import { VersionPanel } from './VersionPanel';
 import VideoCard from './VideoCard';
@@ -109,7 +109,7 @@ export const UserMenu: React.FC = () => {
   const [isDoubanImageProxyDropdownOpen, setIsDoubanImageProxyDropdownOpen] =
     useState(false);
   // 跳过片头片尾相关设置
-  const [enableAutoSkip, setEnableAutoSkip] = useState(true);
+  const [enableAutoSkip, setEnableAutoSkip] = useState(false);
   const [enableAutoNextEpisode, setEnableAutoNextEpisode] = useState(true);
 
   // 豆瓣数据源选项
@@ -834,7 +834,7 @@ export const UserMenu: React.FC = () => {
     setContinueWatchingMinProgress(5);
     setContinueWatchingMaxProgress(100);
     setEnableContinueWatchingFilter(false);
-    setEnableAutoSkip(true);
+    setEnableAutoSkip(false);
     setEnableAutoNextEpisode(true);
 
     if (typeof window !== 'undefined') {
@@ -849,7 +849,7 @@ export const UserMenu: React.FC = () => {
       localStorage.setItem('continueWatchingMinProgress', '5');
       localStorage.setItem('continueWatchingMaxProgress', '100');
       localStorage.setItem('enableContinueWatchingFilter', JSON.stringify(false));
-      localStorage.setItem('enableAutoSkip', JSON.stringify(true));
+      localStorage.setItem('enableAutoSkip', JSON.stringify(false));
       localStorage.setItem('enableAutoNextEpisode', JSON.stringify(true));
     }
   };

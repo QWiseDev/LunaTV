@@ -46,7 +46,7 @@ export default function SkipController({
   const [batchSettings, setBatchSettings] = useState(() => {
     const savedEnableAutoSkip = typeof window !== 'undefined' ? localStorage.getItem('enableAutoSkip') : null;
     const savedEnableAutoNextEpisode = typeof window !== 'undefined' ? localStorage.getItem('enableAutoNextEpisode') : null;
-    const userAutoSkip = savedEnableAutoSkip !== null ? JSON.parse(savedEnableAutoSkip) : true;
+    const userAutoSkip = savedEnableAutoSkip !== null ? JSON.parse(savedEnableAutoSkip) : false;
     const userAutoNextEpisode = savedEnableAutoNextEpisode !== null ? JSON.parse(savedEnableAutoNextEpisode) : true;
 
     return {
@@ -68,7 +68,7 @@ export default function SkipController({
     const loadUserSettings = () => {
       const savedEnableAutoSkip = localStorage.getItem('enableAutoSkip');
       const savedEnableAutoNextEpisode = localStorage.getItem('enableAutoNextEpisode');
-      const userAutoSkip = savedEnableAutoSkip !== null ? JSON.parse(savedEnableAutoSkip) : true;
+      const userAutoSkip = savedEnableAutoSkip !== null ? JSON.parse(savedEnableAutoSkip) : false;
       const userAutoNextEpisode = savedEnableAutoNextEpisode !== null ? JSON.parse(savedEnableAutoNextEpisode) : true;
 
       setBatchSettings(prev => ({
