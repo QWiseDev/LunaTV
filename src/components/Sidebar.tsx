@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Cat, Clover, Film, Globe, Home, Layers, Menu, PlaySquare, Radio, Search, Star, Tv } from 'lucide-react';
+import { Cat, Clover, Film, Globe, Home, Menu, PlaySquare, Radio, Search, Star, Tv, Video } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -151,6 +151,11 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
       icon: PlaySquare,
       label: '短剧',
       href: '/shortdrama',
+    },
+    {
+      icon: Video,
+      label: '短视频',
+      href: '/shortvideo',
     },
     {
       icon: Cat,
@@ -337,6 +342,7 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
                     { hover: 'hover:from-red-50 hover:to-pink-50 dark:hover:from-red-500/10 dark:hover:to-pink-500/10', active: 'data-[active=true]:from-red-500/20 data-[active=true]:to-pink-500/20 dark:data-[active=true]:from-red-500/15 dark:data-[active=true]:to-pink-500/15', text: 'hover:text-red-600 data-[active=true]:text-red-700 dark:hover:text-red-400 dark:data-[active=true]:text-red-400', icon: 'group-hover:text-red-600 data-[active=true]:text-red-700 dark:group-hover:text-red-400 dark:data-[active=true]:text-red-400', shadow: 'hover:shadow-red-500/10 data-[active=true]:shadow-red-500/20', border: 'from-red-500 to-pink-500' }, // 电影
                     { hover: 'hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-500/10 dark:hover:to-indigo-500/10', active: 'data-[active=true]:from-blue-500/20 data-[active=true]:to-indigo-500/20 dark:data-[active=true]:from-blue-500/15 dark:data-[active=true]:to-indigo-500/15', text: 'hover:text-blue-600 data-[active=true]:text-blue-700 dark:hover:text-blue-400 dark:data-[active=true]:text-blue-400', icon: 'group-hover:text-blue-600 data-[active=true]:text-blue-700 dark:group-hover:text-blue-400 dark:data-[active=true]:text-blue-400', shadow: 'hover:shadow-blue-500/10 data-[active=true]:shadow-blue-500/20', border: 'from-blue-500 to-indigo-500' }, // 剧集
                     { hover: 'hover:from-purple-50 hover:to-violet-50 dark:hover:from-purple-500/10 dark:hover:to-violet-500/10', active: 'data-[active=true]:from-purple-500/20 data-[active=true]:to-violet-500/20 dark:data-[active=true]:from-purple-500/15 dark:data-[active=true]:to-violet-500/15', text: 'hover:text-purple-600 data-[active=true]:text-purple-700 dark:hover:text-purple-400 dark:data-[active=true]:text-purple-400', icon: 'group-hover:text-purple-600 data-[active=true]:text-purple-700 dark:group-hover:text-purple-400 dark:data-[active=true]:text-purple-400', shadow: 'hover:shadow-purple-500/10 data-[active=true]:shadow-purple-500/20', border: 'from-purple-500 to-violet-500' }, // 短剧
+                    { hover: 'hover:from-fuchsia-50 hover:to-purple-50 dark:hover:from-fuchsia-500/10 dark:hover:to-purple-500/10', active: 'data-[active=true]:from-fuchsia-500/20 data-[active=true]:to-purple-500/20 dark:data-[active=true]:from-fuchsia-500/15 dark:data-[active=true]:to-purple-500/15', text: 'hover:text-fuchsia-600 data-[active=true]:text-fuchsia-700 dark:hover:text-fuchsia-400 dark:data-[active=true]:text-fuchsia-400', icon: 'group-hover:text-fuchsia-600 data-[active=true]:text-fuchsia-700 dark:group-hover:text-fuchsia-400 dark:data-[active=true]:text-fuchsia-400', shadow: 'hover:shadow-fuchsia-500/10 data-[active=true]:shadow-fuchsia-500/20', border: 'from-fuchsia-500 to-purple-500' }, // 短视频
                     { hover: 'hover:from-pink-50 hover:to-rose-50 dark:hover:from-pink-500/10 dark:hover:to-rose-500/10', active: 'data-[active=true]:from-pink-500/20 data-[active=true]:to-rose-500/20 dark:data-[active=true]:from-pink-500/15 dark:data-[active=true]:to-rose-500/15', text: 'hover:text-pink-600 data-[active=true]:text-pink-700 dark:hover:text-pink-400 dark:data-[active=true]:text-pink-400', icon: 'group-hover:text-pink-600 data-[active=true]:text-pink-700 dark:group-hover:text-pink-400 dark:data-[active=true]:text-pink-400', shadow: 'hover:shadow-pink-500/10 data-[active=true]:shadow-pink-500/20', border: 'from-pink-500 to-rose-500' }, // 动漫
                     { hover: 'hover:from-orange-50 hover:to-amber-50 dark:hover:from-orange-500/10 dark:hover:to-amber-500/10', active: 'data-[active=true]:from-orange-500/20 data-[active=true]:to-amber-500/20 dark:data-[active=true]:from-orange-500/15 dark:data-[active=true]:to-amber-500/15', text: 'hover:text-orange-600 data-[active=true]:text-orange-700 dark:hover:text-orange-400 dark:data-[active=true]:text-orange-400', icon: 'group-hover:text-orange-600 data-[active=true]:text-orange-700 dark:group-hover:text-orange-400 dark:data-[active=true]:text-orange-400', shadow: 'hover:shadow-orange-500/10 data-[active=true]:shadow-orange-500/20', border: 'from-orange-500 to-amber-500' }, // 综艺
                     { hover: 'hover:from-teal-50 hover:to-cyan-50 dark:hover:from-teal-500/10 dark:hover:to-cyan-500/10', active: 'data-[active=true]:from-teal-500/20 data-[active=true]:to-cyan-500/20 dark:data-[active=true]:from-teal-500/15 dark:data-[active=true]:to-cyan-500/15', text: 'hover:text-teal-600 data-[active=true]:text-teal-700 dark:hover:text-teal-400 dark:data-[active=true]:text-teal-400', icon: 'group-hover:text-teal-600 data-[active=true]:text-teal-700 dark:group-hover:text-teal-400 dark:data-[active=true]:text-teal-400', shadow: 'hover:shadow-teal-500/10 data-[active=true]:shadow-teal-500/20', border: 'from-teal-500 to-cyan-500' }, // 直播

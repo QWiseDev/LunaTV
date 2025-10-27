@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Cat, Clover, Film, Globe, Home, Layers, PlaySquare, Radio, Star, Tv } from 'lucide-react';
+import { Cat, Clover, Film, Globe, Home, PlaySquare, Radio, Star, Tv, Video } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -41,6 +41,11 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       icon: PlaySquare,
       label: '短剧',
       href: '/shortdrama',
+    },
+    {
+      icon: Video,
+      label: '短视频',
+      href: '/shortvideo',
     },
     {
       icon: Cat,
@@ -84,7 +89,8 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       decodedActive === decodedItemHref ||
       (decodedActive.startsWith('/douban') &&
         decodedActive.includes(`type=${typeMatch}`)) ||
-      (href === '/shortdrama' && decodedActive.startsWith('/shortdrama'))
+      (href === '/shortdrama' && decodedActive.startsWith('/shortdrama')) ||
+      (href === '/shortvideo' && decodedActive.startsWith('/shortvideo'))
     );
   };
 
