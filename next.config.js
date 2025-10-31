@@ -5,18 +5,20 @@ const nextConfig = {
   output: 'standalone',
   eslint: {
     dirs: ['src'],
+    ignoreDuringBuilds: false,
   },
 
   reactStrictMode: false,
-  swcMinify: false,
+  swcMinify: true,
 
   experimental: {
     instrumentationHook: process.env.NODE_ENV === 'production',
+    optimizePackageImports: ['lucide-react', '@heroicons/react', 'framer-motion'],
   },
 
   // Uncoment to add domain whitelist
   images: {
-    unoptimized: true,
+    unoptimized: false,
     remotePatterns: [
       {
         protocol: 'https',
@@ -27,6 +29,9 @@ const nextConfig = {
         hostname: '**',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
   webpack(config) {

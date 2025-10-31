@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 
 import artplayerPluginChromecast from '@/lib/artplayer-plugin-chromecast';
+
 import { ClientCache } from '@/lib/client-cache';
 import {
   deleteFavorite,

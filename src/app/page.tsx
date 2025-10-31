@@ -3,6 +3,7 @@
 'use client';
 
 import { Brain, ChevronRight, Film, Tv, Calendar, Sparkles, Play } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 
@@ -151,26 +152,24 @@ function HomeClient() {
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
 
   useEffect(() => {
-    // 清理过期缓存
-    cleanExpiredCache().catch(console.error);
+    // 清理过期缓存（低优先级，延迟执行）
+    setTimeout(() => {
+      cleanExpiredCache().catch(console.error);
+    }, 3000);
 
     const fetchRecommendData = async () => {
       try {
         setLoading(true);
 
-        // 并行获取热门电影、热门剧集、热门综艺和热门短剧
-        const [moviesData, tvShowsData, varietyShowsData, shortDramasData, bangumiCalendarData] =
-          await Promise.allSettled([
-            getDoubanCategories({
-              kind: 'movie',
-              category: '热门',
-              type: '全部',
-            }),
-            getDoubanCategories({ kind: 'tv', category: 'tv', type: 'tv' }),
-            getDoubanCategories({ kind: 'tv', category: 'show', type: 'show' }),
-            getRecommendedShortDramas(undefined, 8),
-            GetBangumiCalendarData(),
-          ]);
+        // 优先加载热门电影和剧集（首屏内容）
+        const [moviesData, tvShowsData] = await Promise.allSettled([
+          getDoubanCategories({
+            kind: 'movie',
+            category: '热门',
+            type: '全部',
+          }),
+          getDoubanCategories({ kind: 'tv', category: 'tv', type: 'tv' }),
+        ]);
 
         // 处理电影数据
         if (moviesData.status === 'fulfilled' && moviesData.value?.code === 200) {
@@ -185,6 +184,16 @@ function HomeClient() {
         } else {
           console.warn('获取热门剧集失败:', tvShowsData.status === 'rejected' ? tvShowsData.reason : '数据格式错误');
         }
+
+        // 首屏加载完成
+        setLoading(false);
+
+        // 延迟加载其他内容（非首屏）
+        const [varietyShowsData, shortDramasData, bangumiCalendarData] = await Promise.allSettled([
+          getDoubanCategories({ kind: 'tv', category: 'show', type: 'show' }),
+          getRecommendedShortDramas(undefined, 8),
+          GetBangumiCalendarData(),
+        ]);
 
         // 处理综艺数据
         if (varietyShowsData.status === 'fulfilled' && varietyShowsData.value?.code === 200) {
@@ -211,7 +220,6 @@ function HomeClient() {
         }
       } catch (error) {
         console.error('获取推荐数据失败:', error);
-      } finally {
         setLoading(false);
       }
     };
