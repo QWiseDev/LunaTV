@@ -31,7 +31,6 @@ import {
   ChevronUp,
   Database,
   Download,
-  ExternalLink,
   FileText,
   FolderOpen,
   Settings,
@@ -52,12 +51,12 @@ import AIRecommendConfig from '@/components/AIRecommendConfig';
 import CacheManager from '@/components/CacheManager';
 import DataMigration from '@/components/DataMigration';
 import ImportExportModal from '@/components/ImportExportModal';
+import PageLayout from '@/components/PageLayout';
 import SourceTestModule from '@/components/SourceTestModule';
 import { TelegramAuthConfig } from '@/components/TelegramAuthConfig';
 import TVBoxSecurityConfig from '@/components/TVBoxSecurityConfig';
 import { TVBoxTokenCell, TVBoxTokenModal } from '@/components/TVBoxTokenManager';
 import YouTubeConfig from '@/components/YouTubeConfig';
-import PageLayout from '@/components/PageLayout';
 
 // 统一按钮样式系统
 const buttonStyles = {
